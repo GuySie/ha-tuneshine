@@ -1,0 +1,199 @@
+"""TuneShine local HTTP API client."""
+from __future__ import annotations
+
+import asyncio
+from dataclasses import dataclass
+
+import aiohttp
+
+from .const import (
+    API_PATH_BRIGHTNESS,
+    API_PATH_HEALTH,
+    API_PATH_IMAGE,
+    API_PATH_STATE,
+    DEFAULT_PORT,
+)
+
+
+class TuneshineApiError(Exception):
+    """Base exception for TuneShine API errors."""
+
+
+class TuneshineConnectionError(TuneshineApiError):
+    """Raised when network or timeout errors occur."""
+
+
+@dataclass
+class ImageMetadata:
+    """Metadata for an image displayed on the device."""
+
+    track_name: str | None
+    artist_name: str | None
+    album_name: str | None
+    service_name: str | None
+    sub_service_name: str | None
+    item_id: str | None
+    zone_name: str | None
+    image_url: str | None
+    content_type: str | None
+    last_image_error: str | None
+    idle: bool
+    account_name: str | None
+
+
+@dataclass
+class BrightnessConfig:
+    """Device brightness configuration."""
+
+    base: int
+    active: int
+    idle: int
+
+
+@dataclass
+class TuneshineState:
+    """Full device state from GET /state."""
+
+    hardware_id: str
+    name: str | None
+    firmware_version: str
+    brightness: BrightnessConfig
+    animation: str
+    local_metadata: ImageMetadata | None
+    remote_metadata: ImageMetadata | None
+
+
+def _parse_image_metadata(data: dict | None) -> ImageMetadata | None:
+    """Parse an ImageMetadata object from a raw dict, or return None."""
+    if data is None:
+        return None
+    return ImageMetadata(
+        track_name=data.get("trackName"),
+        artist_name=data.get("artistName"),
+        album_name=data.get("albumName"),
+        service_name=data.get("serviceName"),
+        sub_service_name=data.get("subServiceName"),
+        item_id=data.get("itemId"),
+        zone_name=data.get("zoneName"),
+        image_url=data.get("imageUrl"),
+        content_type=data.get("contentType"),
+        last_image_error=data.get("lastImageError"),
+        idle=data.get("idle", False),
+        account_name=data.get("accountName"),
+    )
+
+
+def _parse_state(data: dict) -> TuneshineState:
+    """Parse a TuneshineState from a raw /state response dict."""
+    config = data.get("config", {})
+    brightness_data = config.get("brightness", {})
+    return TuneshineState(
+        hardware_id=data["hardwareId"],
+        name=data.get("name"),
+        firmware_version=data.get("firmwareVersion", ""),
+        brightness=BrightnessConfig(
+            base=brightness_data.get("base", 50),
+            active=brightness_data.get("active", 50),
+            idle=brightness_data.get("idle", 50),
+        ),
+        animation=config.get("animation", "none"),
+        local_metadata=_parse_image_metadata(data.get("localMetadata")),
+        remote_metadata=_parse_image_metadata(data.get("remoteMetadata")),
+    )
+
+
+class TuneshineApiClient:
+    """Async HTTP client for the TuneShine local API."""
+
+    def __init__(
+        self,
+        host: str,
+        session: aiohttp.ClientSession,
+        port: int = DEFAULT_PORT,
+    ) -> None:
+        """Initialise the client."""
+        self._base_url = f"http://{host}:{port}"
+        self._session = session
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        **kwargs: object,
+    ) -> dict:
+        """Make an HTTP request, returning parsed JSON."""
+        url = f"{self._base_url}{path}"
+        try:
+            async with self._session.request(
+                method,
+                url,
+                timeout=aiohttp.ClientTimeout(total=10),
+                **kwargs,
+            ) as response:
+                if response.status >= 400:
+                    body = await response.text()
+                    raise TuneshineApiError(
+                        f"HTTP {response.status} from {path}: {body}"
+                    )
+                if response.content_type == "application/json":
+                    return await response.json()
+                return {}
+        except aiohttp.ClientError as err:
+            raise TuneshineConnectionError(
+                f"Connection error communicating with TuneShine: {err}"
+            ) from err
+        except asyncio.TimeoutError as err:
+            raise TuneshineConnectionError(
+                f"Timeout communicating with TuneShine at {self._base_url}"
+            ) from err
+
+    async def async_health_check(self) -> None:
+        """GET /health — raises TuneshineConnectionError if unreachable."""
+        await self._request("GET", API_PATH_HEALTH)
+
+    async def async_get_state(self) -> TuneshineState:
+        """GET /state — returns parsed TuneshineState."""
+        data = await self._request("GET", API_PATH_STATE)
+        return _parse_state(data)
+
+    async def async_send_image(
+        self,
+        image_url: str,
+        track_name: str | None = None,
+        artist_name: str | None = None,
+        album_name: str | None = None,
+        service_name: str | None = None,
+        animation: str | None = None,
+    ) -> None:
+        """POST /image — display an image by URL with optional metadata."""
+        body: dict[str, object] = {"imageUrl": image_url}
+        if track_name is not None:
+            body["trackName"] = track_name
+        if artist_name is not None:
+            body["artistName"] = artist_name
+        if album_name is not None:
+            body["albumName"] = album_name
+        if service_name is not None:
+            body["serviceName"] = service_name
+        if animation is not None:
+            body["animation"] = animation
+        await self._request("POST", API_PATH_IMAGE, json=body)
+
+    async def async_clear_image(self) -> None:
+        """DELETE /image — remove locally-provided image."""
+        await self._request("DELETE", API_PATH_IMAGE)
+
+    async def async_set_brightness(
+        self,
+        active: int | None = None,
+        idle: int | None = None,
+    ) -> None:
+        """POST /brightness — set active and/or idle brightness (1–100)."""
+        if active is None and idle is None:
+            raise ValueError("At least one of active or idle must be provided")
+        body: dict[str, int] = {}
+        if active is not None:
+            body["active"] = active
+        if idle is not None:
+            body["idle"] = idle
+        await self._request("POST", API_PATH_BRIGHTNESS, json=body)

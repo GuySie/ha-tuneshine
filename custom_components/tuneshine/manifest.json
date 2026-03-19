@@ -1,0 +1,11 @@
+{
+  "domain": "tuneshine",
+  "name": "TuneShine",
+  "version": "1.0.0",
+  "config_flow": true,
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "dependencies": ["zeroconf"],
+  "zeroconf": ["_tuneshine._tcp.local."],
+  "codeowners": []
+}

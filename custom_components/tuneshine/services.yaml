@@ -1,0 +1,36 @@
+send_image:
+  target:
+    entity:
+      integration: tuneshine
+      domain: media_player
+  fields:
+    image_url:
+      required: true
+      selector:
+        text:
+          type: url
+    track_name:
+      selector:
+        text: {}
+    artist_name:
+      selector:
+        text: {}
+    album_name:
+      selector:
+        text: {}
+    service_name:
+      selector:
+        text: {}
+    animation:
+      selector:
+        select:
+          options:
+            - none
+            - dissolve
+            - crate
+
+clear_image:
+  target:
+    entity:
+      integration: tuneshine
+      domain: media_player

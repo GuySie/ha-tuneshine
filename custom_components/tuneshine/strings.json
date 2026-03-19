@@ -1,0 +1,73 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up TuneShine",
+        "data": {
+          "host": "Host or IP address"
+        },
+        "data_description": {
+          "host": "The IP address or hostname of your TuneShine device (e.g. 192.168.1.100 or tuneshine-E0C4.local)"
+        }
+      },
+      "zeroconf_confirm": {
+        "title": "Discovered TuneShine",
+        "description": "Found **{name}** at `{host}`. Add it to Home Assistant?"
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect. Check the host address and ensure the device is running firmware 2.3.0 or later.",
+      "unknown": "Unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This device is already configured.",
+      "cannot_connect": "Unable to reach the device during discovery."
+    }
+  },
+  "entity": {
+    "number": {
+      "brightness_active": {
+        "name": "Active Brightness"
+      },
+      "brightness_idle": {
+        "name": "Idle Brightness"
+      }
+    }
+  },
+  "services": {
+    "send_image": {
+      "name": "Send Image",
+      "description": "Display an image on the TuneShine LED display.",
+      "fields": {
+        "image_url": {
+          "name": "Image URL",
+          "description": "URL of the image to display. Supports JPEG, PNG, and WebP."
+        },
+        "track_name": {
+          "name": "Track",
+          "description": "Track or song name to associate with the image."
+        },
+        "artist_name": {
+          "name": "Artist",
+          "description": "Artist name to associate with the image."
+        },
+        "album_name": {
+          "name": "Album",
+          "description": "Album name to associate with the image."
+        },
+        "service_name": {
+          "name": "Service",
+          "description": "Name of the source service (e.g. 'Home Assistant', 'Roon')."
+        },
+        "animation": {
+          "name": "Animation",
+          "description": "Override the transition animation for this image change."
+        }
+      }
+    },
+    "clear_image": {
+      "name": "Clear Image",
+      "description": "Remove the locally-provided image and revert the display to music mode."
+    }
+  }
+}
