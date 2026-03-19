@@ -6,10 +6,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import TuneshineApiClient
+from .const import CONF_SOURCE_ENTITY_ID
 from .coordinator import TuneshineDataUpdateCoordinator
 from .entity import TuneshineConfigEntry
 
-PLATFORMS: list[Platform] = [Platform.MEDIA_PLAYER, Platform.NUMBER]
+PLATFORMS: list[Platform] = [Platform.MEDIA_PLAYER, Platform.NUMBER, Platform.SELECT]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: TuneshineConfigEntry) -> bool:
@@ -22,6 +23,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: TuneshineConfigEntry) ->
 
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    entry.async_on_unload(coordinator.async_cleanup_source_listener)
+    await coordinator.async_setup_source_entity(
+        entry.options.get(CONF_SOURCE_ENTITY_ID)
+    )
     return True
 
 

@@ -6,6 +6,7 @@ DEFAULT_PORT = 80
 
 CONF_DEVICE_ID = "device_id"
 CONF_DEVICE_NAME = "device_name"
+CONF_SOURCE_ENTITY_ID = "source_entity_id"
 
 # API paths (confirmed from OpenAPI spec)
 API_PATH_HEALTH = "/health"

@@ -95,7 +95,11 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
         """Return the playback state."""
         data = self.coordinator.data
         if data.local_metadata is not None and not data.local_metadata.idle:
-            # HA has sent a custom image — treat as IDLE (not music mode).
+            # HA sent an image. If we're following a source player, that means
+            # music is actively playing — return PLAYING. For manually sent
+            # static images (no source), treat the display as IDLE.
+            if self.coordinator.has_source:
+                return MediaPlayerState.PLAYING
             return MediaPlayerState.IDLE
         if data.remote_metadata is not None:
             if not data.remote_metadata.idle:

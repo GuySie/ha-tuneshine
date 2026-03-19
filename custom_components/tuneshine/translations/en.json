@@ -24,7 +24,28 @@
       "cannot_connect": "Unable to reach the device during discovery."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "TuneShine options",
+        "data": {
+          "source_entity_id": "Source media player"
+        },
+        "data_description": {
+          "source_entity_id": "Mirror cover art and metadata from this media player onto TuneShine. Leave empty to use only TuneShine's own music source."
+        }
+      }
+    }
+  },
   "entity": {
+    "select": {
+      "source_entity": {
+        "name": "Source Media Player",
+        "state": {
+          "none": "None"
+        }
+      }
+    },
     "number": {
       "brightness_active": {
         "name": "Active Brightness"

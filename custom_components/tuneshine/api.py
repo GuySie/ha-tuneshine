@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass
 
 import aiohttp
@@ -136,7 +137,8 @@ class TuneshineApiClient:
                         f"HTTP {response.status} from {path}: {body}"
                     )
                 if response.content_type == "application/json":
-                    return await response.json()
+                    raw = await response.read()
+                    return json.loads(raw.decode("utf-8", errors="replace"))
                 return {}
         except aiohttp.ClientError as err:
             raise TuneshineConnectionError(
