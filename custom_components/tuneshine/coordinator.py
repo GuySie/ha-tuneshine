@@ -13,7 +13,7 @@ from homeassistant.helpers.event import async_call_later, async_track_state_chan
 from homeassistant.helpers.network import NoURLAvailableError, get_url
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import TuneshineApiClient, TuneshineApiError, TuneshineConnectionError, TuneshineState
+from .api import ImageMetadata, TuneshineApiClient, TuneshineApiError, TuneshineConnectionError, TuneshineState
 from .const import CONF_DEVICE_NAME, DOMAIN, POLL_INTERVAL_SECONDS
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,6 +48,10 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         self._source_unsub: Callable[[], None] | None = None
         self._debounce_unsub: Callable[[], None] | None = None
         self._handler_task: asyncio.Task | None = None
+        # Optimistic local metadata shown immediately after a send/clear command,
+        # before the device's /state response has been updated.  Cleared on every
+        # poll so real device data always wins once it arrives.
+        self.optimistic_local_metadata: ImageMetadata | None = None
 
     async def _async_update_data(self) -> TuneshineState:
         """Fetch state from device."""
@@ -80,7 +84,60 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
                 data={**self._entry.data, CONF_DEVICE_NAME: current_name},
             )
 
+        # Real device data has arrived — discard any optimistic state.
+        self.optimistic_local_metadata = None
         return state
+
+    # ------------------------------------------------------------------
+    # Image operations with optimistic state updates
+    # ------------------------------------------------------------------
+
+    async def async_send_local_image(
+        self,
+        image_url: str,
+        track_name: str | None = None,
+        artist_name: str | None = None,
+        album_name: str | None = None,
+        service_name: str | None = None,
+        animation: str | None = None,
+    ) -> None:
+        """POST /image and optimistically update entity state without touching coordinator data.
+
+        coordinator.data always holds device-confirmed state.  The optimistic
+        attribute is a side-channel that entities read until the next poll
+        overwrites it with real device state.
+        """
+        await self.client.async_send_image(
+            image_url,
+            track_name=track_name,
+            artist_name=artist_name,
+            album_name=album_name,
+            service_name=service_name,
+            animation=animation,
+        )
+        self.optimistic_local_metadata = ImageMetadata(
+            track_name=track_name,
+            artist_name=artist_name,
+            album_name=album_name,
+            service_name=service_name,
+            sub_service_name=None,
+            item_id=None,
+            zone_name=None,
+            image_url=image_url,
+            content_type=None,
+            last_image_error=None,
+            idle=False,
+            account_name=None,
+        )
+        self.async_update_listeners()
+        await self.async_request_refresh()
+
+    async def async_clear_local_image(self) -> None:
+        """DELETE /image and clear the optimistic local metadata immediately."""
+        await self.client.async_clear_image()
+        self.optimistic_local_metadata = None
+        self.async_update_listeners()
+        await self.async_request_refresh()
 
     async def async_setup_source_entity(self, entity_id: str | None) -> None:
         """Set up or replace the source media player subscription in-place."""
@@ -193,7 +250,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
                     "Source player not playing (%s), clearing image",
                     state.state if state else "none",
                 )
-                await self.client.async_clear_image()
+                await self.async_clear_local_image()
             elif state.state == "playing":
                 image_url = self._get_image_url(state)
                 _LOGGER.debug(
@@ -205,10 +262,10 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
                 )
                 if image_url is None:
                     _LOGGER.debug("Source player has no image, clearing TuneShine")
-                    await self.client.async_clear_image()
+                    await self.async_clear_local_image()
                 else:
                     _LOGGER.debug("Sending image to TuneShine: %s", image_url)
-                    await self.client.async_send_image(
+                    await self.async_send_local_image(
                         image_url=image_url,
                         track_name=state.attributes.get("media_title"),
                         artist_name=state.attributes.get("media_artist"),
@@ -220,8 +277,6 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         except TuneshineApiError as err:
             _LOGGER.warning("Failed to update TuneShine from source player: %s", err)
             return
-        _LOGGER.debug("Requesting coordinator refresh after source state handling")
-        await self.async_request_refresh()
 
     def _get_image_url(self, state: State) -> str | None:
         """Return an http:// image URL for the media player's current artwork.

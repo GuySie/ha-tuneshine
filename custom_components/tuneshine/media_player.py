@@ -94,7 +94,8 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
     def state(self) -> MediaPlayerState:
         """Return the playback state."""
         data = self.coordinator.data
-        if data.local_metadata is not None and not data.local_metadata.idle:
+        local = self.coordinator.optimistic_local_metadata or data.local_metadata
+        if local is not None and not local.idle:
             # HA sent an image. If we're following a source player, that means
             # music is actively playing — return PLAYING. For manually sent
             # static images (no source), treat the display as IDLE.
@@ -117,8 +118,9 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
         remote = data.remote_metadata
         if remote and not remote.idle:
             return remote
-        if data.local_metadata and not data.local_metadata.idle:
-            return data.local_metadata
+        local = self.coordinator.optimistic_local_metadata or data.local_metadata
+        if local and not local.idle:
+            return local
         return None
 
     @property
@@ -176,7 +178,8 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes for automations."""
         data = self.coordinator.data
-        if data.local_metadata and not data.local_metadata.idle:
+        local = self.coordinator.optimistic_local_metadata or data.local_metadata
+        if local and not local.idle:
             display_mode = "local"
         elif data.remote_metadata and not data.remote_metadata.idle:
             display_mode = "remote"
@@ -206,10 +209,9 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
         **kwargs: Any,
     ) -> None:
         """Handle play_media — send media_id as an image URL."""
-        await self.coordinator.client.async_send_image(
+        await self.coordinator.async_send_local_image(
             media_id, service_name="Home Assistant"
         )
-        await self.coordinator.async_request_refresh()
 
     async def async_send_image(
         self,
@@ -221,7 +223,7 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
         animation: str | None = None,
     ) -> None:
         """Send an image URL to display on the device (entity service handler)."""
-        await self.coordinator.client.async_send_image(
+        await self.coordinator.async_send_local_image(
             image_url,
             track_name=track_name,
             artist_name=artist_name,
@@ -229,9 +231,7 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
             service_name=service_name or "Home Assistant",
             animation=animation,
         )
-        await self.coordinator.async_request_refresh()
 
     async def async_clear_image(self) -> None:
         """Remove the locally-provided image (entity service handler)."""
-        await self.coordinator.client.async_clear_image()
-        await self.coordinator.async_request_refresh()
+        await self.coordinator.async_clear_local_image()
