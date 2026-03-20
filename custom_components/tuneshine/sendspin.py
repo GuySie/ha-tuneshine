@@ -21,7 +21,7 @@ from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .const import DOMAIN, INPUT_MODE_SENDSPIN
 
 if TYPE_CHECKING:
     from .coordinator import TuneshineDataUpdateCoordinator
@@ -55,6 +55,13 @@ class SendspinWebSocketView(HomeAssistantView):
             )
             raise web.HTTPNotFound
 
+        if coordinator.input_mode != INPUT_MODE_SENDSPIN:
+            _LOGGER.debug(
+                "Sendspin connection for %r rejected — device is in source_following mode",
+                hardware_id,
+            )
+            raise web.HTTPConflict
+
         _LOGGER.debug(
             "Sendspin connection accepted from %s for hardware_id %r",
             request.remote,
@@ -86,6 +93,9 @@ class SendspinHandler:
         device_name = self._coordinator.data.name or "Tuneshine"
         _LOGGER.debug("Sendspin connection opened for device %r (%s)", device_name, hardware_id)
 
+        # Register with coordinator so it can close this connection on mode switch.
+        self._coordinator._on_sendspin_connected(self._ws)
+
         await self._send_client_hello(hardware_id, device_name)
 
         _LOGGER.debug("Sendspin: starting client/time background task for %s", hardware_id)
@@ -108,6 +118,7 @@ class SendspinHandler:
         finally:
             _LOGGER.debug("Sendspin: cancelling client/time background task for %s", hardware_id)
             time_task.cancel()
+            self._coordinator._on_sendspin_disconnected()
             _LOGGER.debug("Sendspin connection closed for device %s", hardware_id)
             await self._send_client_goodbye()
             # If we were in a group when the connection dropped, leave gracefully.

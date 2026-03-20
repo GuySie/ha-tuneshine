@@ -94,9 +94,12 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
     @property
     def state(self) -> MediaPlayerState:
         """Return the playback state."""
-        if self.coordinator.display_mode in (
-            DisplayMode.FOLLOWING, DisplayMode.REMOTE, DisplayMode.SENDSPIN
-        ):
+        mode = self.coordinator.display_mode
+        if mode == DisplayMode.SENDSPIN:
+            # Sendspin is connected but may not be actively streaming.
+            # Only report PLAYING when there is active artwork/metadata to show.
+            return MediaPlayerState.PLAYING if self._active_metadata() else MediaPlayerState.IDLE
+        if mode in (DisplayMode.FOLLOWING, DisplayMode.REMOTE):
             return MediaPlayerState.PLAYING
         return MediaPlayerState.IDLE
 

@@ -5,7 +5,8 @@ Home Assistant integration for the [Tuneshine](https://tuneshine.rocks) LED albu
 
 - **Media player entity** — reflects the display state (playing, idle) and exposes current track, artist, album, and artwork
 - **Source media player** — select any HA media player to mirror; Tuneshine automatically updates when the track changes and clears when playback stops
-- **Sendspin client** — Supports the Sendspin protocol, displaying artwork and metadata
+- **Sendspin client** — supports the Sendspin protocol, displaying artwork and metadata
+- **Input mode** — switch between Source Following and Sendspin; the modes are mutually exclusive
 - **Display mode sensor** — reports what is currently driving the display (`remote`, `local`, `following`, `sendspin`, or `none`)
 - **Brightness controls** — set active and idle brightness (1–100, disabled by default)
 - **Entity services** — `send_image` and `clear_image` for automation use
@@ -21,23 +22,32 @@ The integration will expose a media player that will follow what is currently be
 
 ## Source Following
 
-Instead of the normal method of operation, which relies on Tuneshine's cloud server to send new coverart to your Tuneshine, you can set the integration to follow a media player in Home Assistant.
-After setup, go to the Tuneshine device page and set **Source Entity** to any media player in your system. Tuneshine will display the current track artwork whenever that player is playing, and clear the display when it stops.
+Set **Input Mode** to *Source Following*, then set **Source Entity** to any media player in your system. Tuneshine will display the current track artwork whenever that player is playing, and clear the display when it stops.
 
 ## Sendspin
 
 The integration supports the [Sendspin](https://www.sendspin-audio.com/) protocol, allowing Sendspin servers such as [Music Assistant](https://www.music-assistant.io/player-support/sendspin/) to send artwork and metadata directly to the display.
 
-On startup, the integration advertises the device as a Sendspin client via mDNS (`_sendspin._tcp.local.`) and exposes a WebSocket endpoint on Home Assistant's HTTP server. When a Sendspin server adds the device to a group:
+Set **Input Mode** to *Sendspin*. The integration advertises the device as a Sendspin client via mDNS (`_sendspin._tcp.local.`) and exposes a WebSocket endpoint on Home Assistant's HTTP server. When a Sendspin server adds the device to a group:
 
 - Artwork is received over the Sendspin stream and pushed to the display
 - Track, artist, and album metadata updates the media player entity in real time
-- Source following is suspended for the duration
 - The display mode sensor reports `sendspin`
 
-When the device is removed from the group or the server disconnects, the display is cleared and normal operation resumes (including source following if configured).
+When the device is removed from the group or the server disconnects, the display is cleared.
 
 Sendspin is discovered automatically by Music Assistant once the Sendspin provider is enabled in its settings.
+
+## Input Mode
+
+The **Input Mode** config entity on the device page switches between two mutually exclusive modes:
+
+| Mode | Behaviour |
+|------|-----------|
+| **Source Following** | Mirrors a Home Assistant media player. Sendspin mDNS is not advertised and incoming Sendspin connections are rejected. |
+| **Sendspin** | Advertises the device via mDNS so Sendspin servers can discover and connect to it. Source following is inactive. |
+
+Changing the mode takes effect immediately — switching to Source Following closes any active Sendspin connection and unregisters the mDNS service; switching to Sendspin tears down source following and registers mDNS.
 
 ## Display Mode Sensor
 

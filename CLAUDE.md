@@ -27,9 +27,15 @@ All integration code lives in `custom_components/tuneshine/`.
 
 **State model:** The device has no simple playing/stopped flag. State is inferred from `localMetadata` (HA-sent images) vs `remoteMetadata` (cloud/streaming). The media player entity reports `PLAYING` when `display_mode` is FOLLOWING, REMOTE, or SENDSPIN, otherwise `IDLE`.
 
-**Source following:** When a source entity is configured, the coordinator subscribes to its state changes and sends the artwork URL to the device. Track changes are debounced (0.5s for playing, 2.0s for paused) to absorb brief idle flashes during track transitions. Image URLs are normalized to HTTP — relative paths get HA base URL prepended, HTTPS URLs are proxied through HA's media player proxy. Source following is suspended while Sendspin is active.
+**Input mode:** Each device has an "Input Mode" config select entity (`TuneshineInputModeSelectEntity` in `select.py`) with two mutually exclusive options:
+- `source_following` — source following is active; Sendspin mDNS is not advertised and incoming Sendspin connections are rejected (HTTP 409)
+- `sendspin` — mDNS is advertised; Sendspin servers can connect; source following is inactive
 
-**Sendspin:** The integration advertises itself as a `_sendspin._tcp.local.` mDNS service per device, pointing at a HA WebSocket endpoint at `/api/sendspin/{hardware_id}`. When a Sendspin server (e.g. Music Assistant) connects, it sends artwork (JPEG) and metadata via the protocol. The integration converts incoming JPEG to 64×64 WebP and uploads it to the device via `POST /image` multipart. Artwork bytes are cached for resume. See `sendspin.py` and `.claude/sendspin_reference.md` for full details.
+The mode is persisted to `entry.options[CONF_INPUT_MODE]`. Switching modes is handled by `coordinator.async_set_input_mode()`, which closes any active Sendspin WebSocket, registers/unregisters mDNS, and enables/disables source following. mDNS callbacks (`_async_register_mdns` / `_async_unregister_mdns`) are wired onto the coordinator by `__init__.py` using `functools.partial`. Migration default: existing installs with a source entity configured default to `source_following`; others default to `sendspin`.
+
+**Source following:** When in `source_following` mode and a source entity is configured, the coordinator subscribes to its state changes and sends the artwork URL to the device. Track changes are debounced (0.5s for playing, 2.0s for paused) to absorb brief idle flashes during track transitions. Image URLs are normalized to HTTP — relative paths get HA base URL prepended, HTTPS URLs are proxied through HA's media player proxy.
+
+**Sendspin:** When in `sendspin` mode, the integration advertises itself as a `_sendspin._tcp.local.` mDNS service per device, pointing at a HA WebSocket endpoint at `/api/sendspin/{hardware_id}`. When a Sendspin server (e.g. Music Assistant) connects, it sends artwork (JPEG) and metadata via the protocol. The integration converts incoming JPEG to 64×64 WebP and uploads it to the device via `POST /image` multipart. Artwork bytes are cached for resume. See `sendspin.py` and `.claude/sendspin_reference.md` for full details.
 
 **Optimistic updates:** `async_send_local_image()` and `async_clear_local_image()` update coordinator state immediately before device confirmation, then real state overwrites on next poll. In Sendspin mode, `optimistic_local_metadata` is kept across polls to reflect the current Sendspin track.
 
@@ -44,6 +50,7 @@ All integration code lives in `custom_components/tuneshine/`.
 - `.local` hostnames in manual config are resolved to IPv4 at config flow time
 - Sendspin WebSocket view is registered once (guarded by `_SENDSPIN_VIEW_REGISTERED`) even when multiple devices are configured
 - Sendspin mDNS service name includes hardware_id for per-device uniqueness: `{device_name} ({hardware_id})._sendspin._tcp.local.`
+- mDNS registration is idempotent (`_sendspin_mdns_info` checked before registering); `_async_unregister_sendspin_mdns` is the single unregister path used both at runtime and on entry unload
 - `media_image_remotely_accessible = False` when Sendspin is active — device artwork URL is local HTTP, which HA must proxy to avoid mixed-content blocks in the HTTPS frontend
 - Sendspin artwork is uploaded without `imageUrl` in the multipart metadata so the device stores the binary at `GET /artwork` (see api_reference.md Known Spec Inaccuracies)
 - Declare `media_width/height: 512` in `client/hello` so the Sendspin server sends a higher-resolution image; integration then resizes to 64×64 before uploading to device

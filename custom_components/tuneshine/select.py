@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_SOURCE_ENTITY_ID
+from .const import CONF_INPUT_MODE, CONF_SOURCE_ENTITY_ID, INPUT_MODE_SENDSPIN, INPUT_MODE_SOURCE
 from .coordinator import TuneshineDataUpdateCoordinator
 from .entity import TuneshineConfigEntry, TuneshineEntity
 
@@ -19,8 +19,11 @@ async def async_setup_entry(
     entry: TuneshineConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the source media player select entity."""
-    async_add_entities([TuneshineSourceSelectEntity(entry.runtime_data, entry)])
+    """Set up the source media player and input mode select entities."""
+    async_add_entities([
+        TuneshineSourceSelectEntity(entry.runtime_data, entry),
+        TuneshineInputModeSelectEntity(entry.runtime_data, entry),
+    ])
 
 
 class TuneshineSourceSelectEntity(TuneshineEntity, SelectEntity):
@@ -69,4 +72,30 @@ class TuneshineSourceSelectEntity(TuneshineEntity, SelectEntity):
         else:
             new_options.pop(CONF_SOURCE_ENTITY_ID, None)
         self.hass.config_entries.async_update_entry(self._entry, options=new_options)
+        self.async_write_ha_state()
+
+
+class TuneshineInputModeSelectEntity(TuneshineEntity, SelectEntity):
+    """Select entity to switch between source_following and sendspin input modes."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_icon = "mdi:swap-horizontal"
+    _attr_translation_key = "input_mode"
+    _attr_options = [INPUT_MODE_SOURCE, INPUT_MODE_SENDSPIN]
+
+    def __init__(
+        self,
+        coordinator: TuneshineDataUpdateCoordinator,
+        entry: TuneshineConfigEntry,
+    ) -> None:
+        """Initialise the entity."""
+        super().__init__(coordinator)
+        self._entry = entry
+        self._attr_unique_id = f"{coordinator.data.hardware_id}_input_mode"
+        self._attr_current_option = coordinator.input_mode
+
+    async def async_select_option(self, option: str) -> None:
+        """Switch input mode and persist the selection."""
+        self._attr_current_option = option
+        await self.coordinator.async_set_input_mode(option)
         self.async_write_ha_state()

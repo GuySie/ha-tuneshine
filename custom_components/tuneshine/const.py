@@ -18,6 +18,10 @@ DEFAULT_PORT = 80
 
 CONF_DEVICE_NAME = "device_name"
 CONF_SOURCE_ENTITY_ID = "source_entity_id"
+CONF_INPUT_MODE = "input_mode"
+
+INPUT_MODE_SOURCE = "source_following"
+INPUT_MODE_SENDSPIN = "sendspin"
 
 # API paths (confirmed from OpenAPI spec)
 API_PATH_HEALTH = "/health"

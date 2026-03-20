@@ -1,6 +1,7 @@
 """The Tuneshine integration."""
 from __future__ import annotations
 
+import functools
 import logging
 import socket
 
@@ -9,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import TuneshineApiClient
-from .const import CONF_SOURCE_ENTITY_ID, DOMAIN
+from .const import CONF_SOURCE_ENTITY_ID, DOMAIN, INPUT_MODE_SENDSPIN, INPUT_MODE_SOURCE
 from .coordinator import TuneshineDataUpdateCoordinator
 from .entity import TuneshineConfigEntry
 from .sendspin import SendspinWebSocketView
@@ -39,9 +40,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: TuneshineConfigEntry) ->
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     entry.async_on_unload(coordinator.async_cleanup_source_listener)
-    await coordinator.async_setup_source_entity(
-        entry.options.get(CONF_SOURCE_ENTITY_ID)
-    )
 
     # Register the WebSocket view once across all entries.
     if not hass.data[DOMAIN].get(_SENDSPIN_VIEW_REGISTERED):
@@ -49,10 +47,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: TuneshineConfigEntry) ->
         hass.data[DOMAIN][_SENDSPIN_VIEW_REGISTERED] = True
         _LOGGER.debug("Registered Sendspin WebSocket view at /api/sendspin/{hardware_id}")
 
-    # Advertise this device as a Sendspin client via mDNS.
-    await _async_register_sendspin_mdns(hass, entry, coordinator)
+    # Wire mDNS callbacks so the coordinator can register/unregister at runtime.
+    coordinator._async_register_mdns = functools.partial(
+        _async_register_sendspin_mdns, hass, entry, coordinator
+    )
+    coordinator._async_unregister_mdns = functools.partial(
+        _async_unregister_sendspin_mdns, hass, coordinator
+    )
+
+    # Activate the configured input mode.
+    if coordinator.input_mode == INPUT_MODE_SENDSPIN:
+        await _async_register_sendspin_mdns(hass, entry, coordinator)
+    elif coordinator.input_mode == INPUT_MODE_SOURCE:
+        await coordinator.async_setup_source_entity(entry.options.get(CONF_SOURCE_ENTITY_ID))
 
     return True
+
+
+async def _async_unregister_sendspin_mdns(
+    hass: HomeAssistant,
+    coordinator: TuneshineDataUpdateCoordinator,
+) -> None:
+    """Unregister the Sendspin mDNS service for this device."""
+    mdns_info = getattr(coordinator, "_sendspin_mdns_info", None)
+    if mdns_info is None:
+        return
+    try:
+        from homeassistant.components.zeroconf import async_get_instance
+
+        zc = await async_get_instance(hass)
+        await zc.async_unregister_service(mdns_info)
+        coordinator._sendspin_mdns_info = None
+        _LOGGER.debug("Unregistered Sendspin mDNS service for %s", coordinator.data.hardware_id)
+    except Exception:
+        _LOGGER.debug("Failed to unregister Sendspin mDNS service (may already be gone)")
 
 
 async def _async_register_sendspin_mdns(
@@ -60,7 +88,9 @@ async def _async_register_sendspin_mdns(
     entry: TuneshineConfigEntry,
     coordinator: TuneshineDataUpdateCoordinator,
 ) -> None:
-    """Register a _sendspin._tcp.local. mDNS service for this device."""
+    """Register a _sendspin._tcp.local. mDNS service for this device (idempotent)."""
+    if getattr(coordinator, "_sendspin_mdns_info", None) is not None:
+        return  # already registered
     try:
         from homeassistant.components.zeroconf import async_get_instance
         from zeroconf import ServiceInfo
@@ -133,17 +163,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: TuneshineConfigEntry) -
     """Unload a Tuneshine config entry."""
     coordinator: TuneshineDataUpdateCoordinator = entry.runtime_data
 
-    # Unregister the Sendspin mDNS advertisement.
-    mdns_info = getattr(coordinator, "_sendspin_mdns_info", None)
-    if mdns_info is not None:
-        try:
-            from homeassistant.components.zeroconf import async_get_instance
-
-            zc = await async_get_instance(hass)
-            await zc.async_unregister_service(mdns_info)
-            _LOGGER.debug("Unregistered Sendspin mDNS service for %s", coordinator.data.hardware_id)
-        except Exception:
-            _LOGGER.debug("Failed to unregister Sendspin mDNS service (may already be gone)")
+    # Unregister the Sendspin mDNS advertisement (no-op if not currently registered).
+    await _async_unregister_sendspin_mdns(hass, coordinator)
 
     # Remove hardware_id index entry.
     hass.data.get(DOMAIN, {}).pop(coordinator.data.hardware_id, None)

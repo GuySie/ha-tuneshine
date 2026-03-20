@@ -56,6 +56,13 @@
         "state": {
           "none": "None"
         }
+      },
+      "input_mode": {
+        "name": "Input Mode",
+        "state": {
+          "source_following": "Source Following",
+          "sendspin": "Sendspin"
+        }
       }
     },
     "number": {
