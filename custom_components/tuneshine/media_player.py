@@ -94,7 +94,9 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
     @property
     def state(self) -> MediaPlayerState:
         """Return the playback state."""
-        if self.coordinator.display_mode in (DisplayMode.FOLLOWING, DisplayMode.REMOTE):
+        if self.coordinator.display_mode in (
+            DisplayMode.FOLLOWING, DisplayMode.REMOTE, DisplayMode.SENDSPIN
+        ):
             return MediaPlayerState.PLAYING
         return MediaPlayerState.IDLE
 
@@ -105,6 +107,13 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
     def _active_metadata(self) -> ImageMetadata | None:
         """Return the most relevant metadata to surface."""
         data = self.coordinator.data
+        # When Sendspin is driving the display, local (Sendspin-uploaded) metadata
+        # takes priority over any concurrent remote track from the Tuneshine cloud.
+        if self.coordinator.sendspin_active:
+            local = self.coordinator.optimistic_local_metadata or data.local_metadata
+            if local and not local.idle:
+                return local
+            return None
         remote = data.remote_metadata
         if remote and not remote.idle:
             return remote

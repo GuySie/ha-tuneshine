@@ -14,7 +14,7 @@ from homeassistant.helpers.network import NoURLAvailableError, get_url
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import ImageMetadata, TuneshineApiClient, TuneshineApiError, TuneshineConnectionError, TuneshineState
-from .const import CONF_DEVICE_NAME, DOMAIN, POLL_INTERVAL_SECONDS, DisplayMode
+from .const import CONF_DEVICE_NAME, CONF_SOURCE_ENTITY_ID, DOMAIN, POLL_INTERVAL_SECONDS, DisplayMode
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,6 +53,14 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         # poll so real device data always wins once it arrives.
         self.optimistic_local_metadata: ImageMetadata | None = None
         self._last_remote_item_id: str | None = None
+        # Sendspin state — set when a Sendspin server has added this client to a group.
+        self._sendspin_active: bool = False
+        self._sendspin_group_id: str | None = None
+        self._sendspin_group_name: str | None = None
+        self._sendspin_metadata: dict = {}
+        # Incremented on each artwork upload; used as a cache-bust query parameter
+        # when setting imageUrl on the device to http://{host}/artwork?v=N.
+        self._sendspin_track_counter: int = 0
 
     async def _async_update_data(self) -> TuneshineState:
         """Fetch state from device."""
@@ -229,8 +237,15 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         return self._source_unsub is not None
 
     @property
+    def sendspin_active(self) -> bool:
+        """Return True when a Sendspin server has added this client to a group."""
+        return self._sendspin_active
+
+    @property
     def display_mode(self) -> DisplayMode:
         """Return how the display is currently being driven."""
+        if self._sendspin_active:
+            return DisplayMode.SENDSPIN
         local = self.optimistic_local_metadata or self.data.local_metadata
         if local and not local.idle:
             return DisplayMode.FOLLOWING if self.has_source else DisplayMode.LOCAL
@@ -257,6 +272,9 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
 
     async def _async_handle_source_state(self, state: State | None) -> None:
         """Send or clear image based on the source media player's state."""
+        # Sendspin takes over artwork delivery when active; ignore source changes.
+        if self._sendspin_active:
+            return
         # Re-read the current state before acting: the debounced snapshot may be stale
         # if the source recovered to playing in the brief window between the debounce
         # firing and this coroutine actually running (e.g. a transient idle flash).
@@ -375,3 +393,99 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
 
         _LOGGER.debug("_get_image_url: unrecognised URL scheme in %r, returning None", entity_picture)
         return None
+
+    # ------------------------------------------------------------------
+    # Sendspin callbacks — called by SendspinHandler when protocol events arrive
+    # ------------------------------------------------------------------
+
+    async def async_on_sendspin_group_joined(
+        self, group_id: str, group_name: str | None
+    ) -> None:
+        """Handle the client being added to a Sendspin group."""
+        _LOGGER.debug(
+            "Sendspin group joined: group_id=%r group_name=%r", group_id, group_name
+        )
+        self._sendspin_active = True
+        self._sendspin_group_id = group_id
+        self._sendspin_group_name = group_name
+        self.async_update_listeners()
+
+    async def async_on_sendspin_group_left(self) -> None:
+        """Handle the client being removed from a Sendspin group."""
+        _LOGGER.debug("Sendspin group left — reverting to normal operation")
+        self._sendspin_active = False
+        self._sendspin_group_id = None
+        self._sendspin_group_name = None
+        self._sendspin_metadata = {}
+        try:
+            await self.async_clear_local_image()
+        except TuneshineApiError as err:
+            _LOGGER.warning("Failed to clear image after Sendspin group left: %s", err)
+        # Re-trigger source following if a source media player is configured.
+        source_entity_id = self._entry.options.get(CONF_SOURCE_ENTITY_ID)
+        if source_entity_id:
+            await self.async_setup_source_entity(source_entity_id)
+
+    async def async_on_sendspin_metadata(self, metadata: dict) -> None:
+        """Store incoming track metadata from the Sendspin server."""
+        _LOGGER.debug(
+            "Sendspin metadata: title=%r artist=%r album=%r",
+            metadata.get("title"),
+            metadata.get("artist"),
+            metadata.get("album"),
+        )
+        self._sendspin_metadata = metadata
+        self.async_update_listeners()
+
+    async def async_on_sendspin_artwork(self, image_bytes: bytes) -> None:
+        """Upload incoming artwork binary to the device and update entity state."""
+        self._sendspin_track_counter += 1
+        # Build an http:// URL pointing at the device's own /artwork endpoint.
+        # The ?v= parameter acts as a cache-bust so HA re-fetches on each track change.
+        host_with_port = self.client._base_url.split("//", 1)[1]
+        artwork_url = f"http://{host_with_port}/artwork?v={self._sendspin_track_counter}"
+        meta = self._sendspin_metadata
+        _LOGGER.debug(
+            "Sendspin artwork received (%d bytes), uploading to device — track=%r artist=%r",
+            len(image_bytes),
+            meta.get("title"),
+            meta.get("artist"),
+        )
+        try:
+            await self.client.async_send_image_binary(
+                image_bytes=image_bytes,
+                image_url=artwork_url,
+                track_name=meta.get("title"),
+                artist_name=meta.get("artist"),
+                album_name=meta.get("album"),
+                service_name=self._sendspin_group_name,
+            )
+        except TuneshineApiError as err:
+            _LOGGER.warning("Failed to upload Sendspin artwork: %s", err)
+            return
+        self.optimistic_local_metadata = ImageMetadata(
+            track_name=meta.get("title"),
+            artist_name=meta.get("artist"),
+            album_name=meta.get("album"),
+            service_name=self._sendspin_group_name,
+            sub_service_name=None,
+            item_id=str(self._sendspin_track_counter),
+            zone_name=None,
+            image_url=artwork_url,
+            content_type="track",
+            last_image_error=None,
+            idle=False,
+            account_name=None,
+        )
+        self.async_update_listeners()
+        await self.async_request_refresh()
+
+    async def async_on_sendspin_stream_end(self) -> None:
+        """Handle stream end — clear artwork if Sendspin is still active."""
+        if not self._sendspin_active:
+            return
+        _LOGGER.debug("Sendspin stream/end received — clearing artwork")
+        try:
+            await self.async_clear_local_image()
+        except TuneshineApiError as err:
+            _LOGGER.warning("Failed to clear image on Sendspin stream end: %s", err)

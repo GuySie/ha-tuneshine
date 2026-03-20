@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from dataclasses import dataclass
 
 import aiohttp
+
+_LOGGER = logging.getLogger(__name__)
 
 from .const import (
     API_PATH_BRIGHTNESS,
@@ -184,6 +187,36 @@ class TuneshineApiClient:
     async def async_clear_image(self) -> None:
         """DELETE /image — remove locally-provided image."""
         await self._request("DELETE", API_PATH_IMAGE)
+
+    async def async_send_image_binary(
+        self,
+        image_bytes: bytes,
+        image_url: str | None = None,
+        track_name: str | None = None,
+        artist_name: str | None = None,
+        album_name: str | None = None,
+        service_name: str | None = None,
+    ) -> None:
+        """POST /image with multipart/form-data — upload binary image directly."""
+        metadata: dict[str, object] = {}
+        if image_url is not None:
+            metadata["imageUrl"] = image_url
+        if track_name is not None:
+            metadata["trackName"] = track_name
+        if artist_name is not None:
+            metadata["artistName"] = artist_name
+        if album_name is not None:
+            metadata["albumName"] = album_name
+        if service_name is not None:
+            metadata["serviceName"] = service_name
+        form = aiohttp.FormData()
+        form.add_field("image", image_bytes, content_type="image/jpeg")
+        if metadata:
+            form.add_field("metadata", json.dumps(metadata), content_type="application/json")
+        _LOGGER.debug(
+            "POST /image (binary): %d bytes, metadata=%r", len(image_bytes), metadata or None
+        )
+        await self._request("POST", API_PATH_IMAGE, data=form)
 
     async def async_set_brightness(
         self,

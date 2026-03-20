@@ -45,6 +45,7 @@
           "following": "Following",
           "local": "Local",
           "remote": "Remote",
+          "sendspin": "Sendspin",
           "none": "None"
         }
       }

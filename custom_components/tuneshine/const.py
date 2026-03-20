@@ -8,6 +8,7 @@ class DisplayMode(StrEnum):
     FOLLOWING = "following"
     LOCAL = "local"
     REMOTE = "remote"
+    SENDSPIN = "sendspin"
     NONE = "none"
 
 
