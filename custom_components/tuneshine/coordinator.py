@@ -66,11 +66,14 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             ) from err
 
         _LOGGER.debug(
-            "Polled state: hardware_id=%s name=%r brightness=%s animation=%s",
+            "Polled state: hardware_id=%s name=%r brightness=%s animation=%s"
+            " local_err=%r remote_err=%r",
             state.hardware_id,
             state.name,
             state.brightness,
             state.animation,
+            state.local_metadata.last_image_error if state.local_metadata else None,
+            state.remote_metadata.last_image_error if state.remote_metadata else None,
         )
 
         # Keep the config entry title in sync with the device name.
