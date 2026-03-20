@@ -1,6 +1,7 @@
 """DataUpdateCoordinator for TuneShine."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
 from datetime import timedelta
@@ -46,6 +47,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         self._entry = entry
         self._source_unsub: Callable[[], None] | None = None
         self._debounce_unsub: Callable[[], None] | None = None
+        self._handler_task: asyncio.Task | None = None
 
     async def _async_update_data(self) -> TuneshineState:
         """Fetch state from device."""
@@ -131,7 +133,12 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             def _debounced(_now: object) -> None:  # noqa: ARG001
                 _LOGGER.debug("Debounce timer fired for %s", entity_id)
                 self._debounce_unsub = None
-                self.hass.async_create_task(self._async_handle_source_state(new_state))
+                if self._handler_task is not None and not self._handler_task.done():
+                    _LOGGER.debug("Cancelling in-flight handler task")
+                    self._handler_task.cancel()
+                self._handler_task = self.hass.async_create_task(
+                    self._async_handle_source_state(new_state)
+                )
 
             self._debounce_unsub = async_call_later(self.hass, delay, _debounced)
 
@@ -148,6 +155,10 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
     def async_cleanup_source_listener(self) -> None:
         """Unsubscribe from the source media player state listener."""
         _LOGGER.debug("Cleaning up source listener")
+        if self._handler_task is not None and not self._handler_task.done():
+            _LOGGER.debug("Cancelling in-flight handler task during cleanup")
+            self._handler_task.cancel()
+        self._handler_task = None
         if self._debounce_unsub is not None:
             _LOGGER.debug("Cancelling pending debounce timer during cleanup")
             self._debounce_unsub()
