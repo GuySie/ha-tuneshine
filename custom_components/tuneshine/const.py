@@ -17,7 +17,7 @@ API_PATH_ARTWORK = "/artwork"
 
 # Poll every 10s — local device, cheap; timely enough for track changes.
 # always_update=False means the coordinator skips callbacks when data is unchanged.
-POLL_INTERVAL_SECONDS = 10
+POLL_INTERVAL_SECONDS = 30
 
 ANIMATIONS = ["none", "dissolve", "crate", "crate_to_idle", "crate_from_idle"]
 
