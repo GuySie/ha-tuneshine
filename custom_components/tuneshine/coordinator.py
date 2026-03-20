@@ -179,6 +179,10 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         attribute is a side-channel that entities read until the next poll
         overwrites it with real device state.
         """
+        _LOGGER.debug(
+            "async_send_local_image: url=%s track=%r artist=%r album=%r service=%r animation=%r",
+            image_url, track_name, artist_name, album_name, service_name, animation,
+        )
         await self.client.async_send_image(
             image_url,
             track_name=track_name,
@@ -206,6 +210,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
 
     async def async_clear_local_image(self) -> None:
         """DELETE /image and clear the optimistic local metadata immediately."""
+        _LOGGER.debug("async_clear_local_image called")
         await self.client.async_clear_image()
         self.optimistic_local_metadata = None
         self.async_update_listeners()

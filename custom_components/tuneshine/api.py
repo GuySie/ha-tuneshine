@@ -171,6 +171,10 @@ class TuneshineApiClient:
         animation: str | None = None,
     ) -> None:
         """POST /image — display an image by URL with optional metadata."""
+        _LOGGER.debug(
+            "POST /image (url): %s track=%r artist=%r album=%r service=%r animation=%r",
+            image_url, track_name, artist_name, album_name, service_name, animation,
+        )
         body: dict[str, object] = {"imageUrl": image_url}
         if track_name is not None:
             body["trackName"] = track_name
@@ -195,6 +199,10 @@ class TuneshineApiClient:
 
         Raises TuneshineApiError with status 409 if no local image is currently set.
         """
+        _LOGGER.debug(
+            "POST /image (metadata only): track=%r artist=%r album=%r service=%r",
+            track_name, artist_name, album_name, service_name,
+        )
         body: dict[str, object] = {}
         if track_name is not None:
             body["trackName"] = track_name
@@ -208,6 +216,7 @@ class TuneshineApiClient:
 
     async def async_clear_image(self) -> None:
         """DELETE /image — remove locally-provided image."""
+        _LOGGER.debug("DELETE /image")
         await self._request("DELETE", API_PATH_IMAGE)
 
     async def async_send_image_binary(
@@ -248,6 +257,7 @@ class TuneshineApiClient:
         """POST /brightness — set active and/or idle brightness (1–100)."""
         if active is None and idle is None:
             raise ValueError("At least one of active or idle must be provided")
+        _LOGGER.debug("POST /brightness: active=%r idle=%r", active, idle)
         body: dict[str, int] = {}
         if active is not None:
             body["active"] = active

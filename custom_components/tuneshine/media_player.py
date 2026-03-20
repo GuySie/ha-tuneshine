@@ -1,9 +1,12 @@
 """Tuneshine media player entity."""
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import voluptuous as vol
+
+_LOGGER = logging.getLogger(__name__)
 
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
@@ -211,6 +214,7 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
         **kwargs: Any,
     ) -> None:
         """Handle play_media — send media_id as an image URL."""
+        _LOGGER.debug("async_play_media: media_type=%r media_id=%r", media_type, media_id)
         await self.coordinator.async_send_local_image(
             media_id, service_name="Home Assistant"
         )
@@ -225,6 +229,10 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
         animation: str | None = None,
     ) -> None:
         """Send an image URL to display on the device (entity service handler)."""
+        _LOGGER.debug(
+            "send_image service: url=%s track=%r artist=%r album=%r service=%r animation=%r",
+            image_url, track_name, artist_name, album_name, service_name, animation,
+        )
         await self.coordinator.async_send_local_image(
             image_url,
             track_name=track_name,
@@ -236,4 +244,5 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
 
     async def async_clear_image(self) -> None:
         """Remove the locally-provided image (entity service handler)."""
+        _LOGGER.debug("clear_image service")
         await self.coordinator.async_clear_local_image()

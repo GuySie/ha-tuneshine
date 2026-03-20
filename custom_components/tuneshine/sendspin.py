@@ -98,7 +98,7 @@ class SendspinHandler:
 
         await self._send_client_hello(hardware_id, device_name)
 
-        _LOGGER.debug("Sendspin: starting client/time background task for %s", hardware_id)
+        _LOGGER.debug("Sendspin starting client/time background task for %s", hardware_id)
         time_task = asyncio.create_task(self._client_time_loop(hardware_id))
         try:
             async for msg in self._ws:
@@ -116,7 +116,7 @@ class SendspinHandler:
         except Exception:
             _LOGGER.exception("Unexpected error in Sendspin handler for %s", hardware_id)
         finally:
-            _LOGGER.debug("Sendspin: cancelling client/time background task for %s", hardware_id)
+            _LOGGER.debug("Sendspin cancelling client/time background task for %s", hardware_id)
             time_task.cancel()
             self._coordinator._on_sendspin_disconnected()
             _LOGGER.debug("Sendspin connection closed for device %s", hardware_id)
@@ -169,32 +169,32 @@ class SendspinHandler:
             while True:
                 await asyncio.sleep(5)
                 if self._ws.closed:
-                    _LOGGER.debug("Sendspin: client/time loop stopping — WebSocket closed for %s", hardware_id)
+                    _LOGGER.debug("Sendspin client/time loop stopping — WebSocket closed for %s", hardware_id)
                     break
                 await self._send_client_time()
         except asyncio.CancelledError:
-            _LOGGER.debug("Sendspin: client/time loop cancelled for %s", hardware_id)
+            _LOGGER.debug("Sendspin client/time loop cancelled for %s", hardware_id)
         except Exception:
-            _LOGGER.debug("Sendspin: client/time loop ended unexpectedly for %s", hardware_id, exc_info=True)
+            _LOGGER.debug("Sendspin client/time loop ended unexpectedly for %s", hardware_id, exc_info=True)
 
     async def _send_client_goodbye(self) -> None:
         """Send client/goodbye before closing."""
         if self._ws.closed:
-            _LOGGER.debug("Sendspin: skipping client/goodbye — WebSocket already closed")
+            _LOGGER.debug("Sendspin skipping client/goodbye — WebSocket already closed")
             return
         try:
             msg = {"type": "client/goodbye", "payload": {"reason": "shutdown"}}
             await self._ws.send_str(json.dumps(msg))
             _LOGGER.debug("Sent client/goodbye")
         except Exception:
-            _LOGGER.debug("Sendspin: failed to send client/goodbye", exc_info=True)
+            _LOGGER.debug("Sendspin failed to send client/goodbye", exc_info=True)
 
     async def _handle_text(self, data: str) -> None:
         """Dispatch an incoming JSON text message by type."""
         try:
             parsed = json.loads(data)
         except json.JSONDecodeError:
-            _LOGGER.debug("Sendspin: ignoring non-JSON text message")
+            _LOGGER.debug("Sendspin ignoring non-JSON text message")
             return
 
         msg_type = parsed.get("type")
@@ -253,12 +253,12 @@ class SendspinHandler:
             await self._coordinator.async_on_sendspin_stream_end()
 
         else:
-            _LOGGER.debug("Sendspin: ignoring message type %r", msg_type)
+            _LOGGER.debug("Sendspin ignoring message type %r", msg_type)
 
     async def _handle_binary(self, data: bytes) -> None:
         """Handle a binary message — extract artwork from channel 0."""
         if len(data) < _BINARY_HEADER_SIZE:
-            _LOGGER.debug("Sendspin: binary message too short (%d bytes), ignoring", len(data))
+            _LOGGER.debug("Sendspin binary message too short (%d bytes), ignoring", len(data))
             return
 
         msg_type, _timestamp_us = struct.unpack_from(_BINARY_HEADER_FORMAT, data)
@@ -266,10 +266,10 @@ class SendspinHandler:
         if msg_type == _ARTWORK_CHANNEL_0:
             image_bytes = data[_BINARY_HEADER_SIZE:]
             if image_bytes:
-                _LOGGER.debug("Sendspin: received artwork (%d bytes)", len(image_bytes))
+                _LOGGER.debug("Sendspin received artwork (%d bytes)", len(image_bytes))
                 await self._coordinator.async_on_sendspin_artwork(image_bytes)
             else:
-                _LOGGER.debug("Sendspin: received artwork clear (empty payload)")
+                _LOGGER.debug("Sendspin received artwork clear (empty payload)")
                 await self._coordinator.async_on_sendspin_stream_end()
         else:
-            _LOGGER.debug("Sendspin: ignoring binary message type %d", msg_type)
+            _LOGGER.debug("Sendspin ignoring binary message type %d", msg_type)
