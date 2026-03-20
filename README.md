@@ -3,7 +3,8 @@ Home Assistant integration for the [TuneShine](https://tuneshine.rocks) LED albu
 
 ## Features
 
-- **Media player entity** — reflects the display state (playing, idle, standby) and exposes current track, artist, album, and artwork
+- **Media player entity** — reflects the display state (playing, idle) and exposes current track, artist, album, and artwork
+- **Display mode sensor** — reports what is currently driving the display (`remote`, `local`, `following`, or `none`)
 - **Source media player** — select any HA media player to mirror; TuneShine automatically updates when the track changes and clears when playback stops
 - **Brightness controls** — set active and idle brightness (1–100, disabled by default)
 - **Entity services** — `send_image` and `clear_image` for automation use
@@ -21,6 +22,17 @@ The integration will expose a media player that will follow what is currently be
 
 Instead of the normal method of operation, which relies on TuneShine's cloud server to send new coverart to your TuneShine, you can set the integration to follow a media player in Home Assistant.  
 After setup, go to the TuneShine device page and set **Source Entity** to any media player in your system. TuneShine will display the current track artwork whenever that player is playing, and clear the display when it stops.
+
+## Display Mode Sensor
+
+The **Display Mode** sensor reports what is currently driving the TuneShine display:
+
+| Value | Meaning |
+|-------|---------|
+| `remote` | A cloud or streaming service (e.g. Spotify) is sending artwork |
+| `local` | An image was sent via the `send_image` service |
+| `following` | The integration is mirroring a Home Assistant media player |
+| `none` | The display is idle with no active source |
 
 ## Entity Services
 
@@ -41,6 +53,10 @@ Display an image by URL on the device.
 
 Remove the locally-provided image, returning the display to its idle state.
 
+## API
+
+This integration was built against TuneShine firmware 2.3.2.
+
 ## Vibecoding
 
-This integration was created using Claude Code, based on the [TuneShine API documentation](https://links.tuneshine.rocks/help#api). If you do not trust AI-generated code, please do not install this integration.
+This integration was created for my personal use using Claude Code, based on the [TuneShine API documentation](https://links.tuneshine.rocks/help#api). I am not a developer and this is in no way intended to be an official integration you should rely on in production - it is very *"it works on my computer"*. If you do not trust AI-generated code, please do not install this integration.
