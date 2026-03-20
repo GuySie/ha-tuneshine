@@ -105,8 +105,8 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
         if data.remote_metadata is not None:
             if not data.remote_metadata.idle:
                 return MediaPlayerState.PLAYING
-            return MediaPlayerState.STANDBY
-        return MediaPlayerState.STANDBY
+            return MediaPlayerState.IDLE
+        return MediaPlayerState.IDLE
 
     # ------------------------------------------------------------------
     # Media attributes — prefer remote (streaming service) over local (HA).
