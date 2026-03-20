@@ -13,6 +13,8 @@ from homeassistant.helpers.event import async_call_later, async_track_state_chan
 from homeassistant.helpers.network import NoURLAvailableError, get_url
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+import io
+
 from .api import ImageMetadata, TuneshineApiClient, TuneshineApiError, TuneshineConnectionError, TuneshineState
 from .const import CONF_DEVICE_NAME, CONF_SOURCE_ENTITY_ID, DOMAIN, POLL_INTERVAL_SECONDS, DisplayMode
 
@@ -21,6 +23,20 @@ _LOGGER = logging.getLogger(__name__)
 _NON_PLAYING_STATES = frozenset({
     STATE_UNAVAILABLE, STATE_UNKNOWN, "off", "idle", "paused", "standby"
 })
+
+
+def _convert_to_webp(image_bytes: bytes) -> bytes:
+    """Convert image bytes to WebP format (blocking — run in executor).
+
+    The Tuneshine device only accepts WebP for multipart binary uploads.
+    Sendspin sends JPEG, so this conversion is needed before uploading.
+    """
+    from PIL import Image  # noqa: PLC0415 — lazy import; Pillow is an HA dependency
+
+    with Image.open(io.BytesIO(image_bytes)) as img:
+        out = io.BytesIO()
+        img.save(out, format="WEBP")
+        return out.getvalue()
 
 
 class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
@@ -113,7 +129,10 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             self._last_remote_item_id = None
 
         # Real device data has arrived — discard any optimistic state.
-        self.optimistic_local_metadata = None
+        # Exception: while Sendspin is active, keep the optimistic metadata so the
+        # entity reflects the current Sendspin track between artwork uploads and polls.
+        if not self._sendspin_active:
+            self.optimistic_local_metadata = None
         return state
 
     # ------------------------------------------------------------------
@@ -408,6 +427,9 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         self._sendspin_active = True
         self._sendspin_group_id = group_id
         self._sendspin_group_name = group_name
+        # Clear any stale optimistic state from source-following so it doesn't
+        # bleed into Sendspin mode (stale HA proxy URLs are no longer valid).
+        self.optimistic_local_metadata = None
         self.async_update_listeners()
 
     async def async_on_sendspin_group_left(self) -> None:
@@ -435,6 +457,25 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             metadata.get("album"),
         )
         self._sendspin_metadata = metadata
+        # Update optimistic metadata immediately so title/artist/album reflect the
+        # new track without waiting for artwork. Preserve the image URL only from
+        # optimistic state (Sendspin-uploaded artwork) — data.local_metadata may
+        # be stale from source-following and its proxy URLs are no longer valid.
+        existing = self.optimistic_local_metadata
+        self.optimistic_local_metadata = ImageMetadata(
+            track_name=metadata.get("title"),
+            artist_name=metadata.get("artist"),
+            album_name=metadata.get("album"),
+            service_name=self._sendspin_group_name,
+            sub_service_name=None,
+            item_id=None,
+            zone_name=None,
+            image_url=existing.image_url if existing else None,
+            content_type="track",
+            last_image_error=None,
+            idle=False,
+            account_name=None,
+        )
         self.async_update_listeners()
 
     async def async_on_sendspin_artwork(self, image_bytes: bytes) -> None:
@@ -446,15 +487,26 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         artwork_url = f"http://{host_with_port}/artwork?v={self._sendspin_track_counter}"
         meta = self._sendspin_metadata
         _LOGGER.debug(
-            "Sendspin artwork received (%d bytes), uploading to device — track=%r artist=%r",
+            "Sendspin artwork received (%d bytes), converting to WebP — track=%r artist=%r",
             len(image_bytes),
             meta.get("title"),
             meta.get("artist"),
         )
+        # The Tuneshine device only accepts WebP for binary (multipart) uploads.
+        # Sendspin sends JPEG, so convert in a thread executor (Pillow is blocking).
+        try:
+            webp_bytes = await self.hass.async_add_executor_job(
+                _convert_to_webp, image_bytes
+            )
+        except Exception as err:
+            _LOGGER.warning("Failed to convert Sendspin artwork to WebP: %s", err)
+            return
+        _LOGGER.debug("Converted to WebP: %d bytes", len(webp_bytes))
         try:
             await self.client.async_send_image_binary(
-                image_bytes=image_bytes,
-                image_url=artwork_url,
+                image_bytes=webp_bytes,
+                # Do not pass image_url — the device only stores the binary for
+                # GET /artwork when no URL is included in the multipart upload.
                 track_name=meta.get("title"),
                 artist_name=meta.get("artist"),
                 album_name=meta.get("album"),

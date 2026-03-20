@@ -210,7 +210,7 @@ class TuneshineApiClient:
         if service_name is not None:
             metadata["serviceName"] = service_name
         form = aiohttp.FormData()
-        form.add_field("image", image_bytes, content_type="image/jpeg")
+        form.add_field("image", image_bytes, content_type="image/webp")
         if metadata:
             form.add_field("metadata", json.dumps(metadata), content_type="application/json")
         _LOGGER.debug(

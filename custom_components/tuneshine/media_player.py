@@ -110,7 +110,10 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
         # When Sendspin is driving the display, local (Sendspin-uploaded) metadata
         # takes priority over any concurrent remote track from the Tuneshine cloud.
         if self.coordinator.sendspin_active:
-            local = self.coordinator.optimistic_local_metadata or data.local_metadata
+            # In Sendspin mode, only use optimistic_local_metadata — data.local_metadata
+            # may be stale from a prior source-following session and its image URLs
+            # (e.g. HA media proxy tokens) are no longer valid.
+            local = self.coordinator.optimistic_local_metadata
             if local and not local.idle:
                 return local
             return None
@@ -148,8 +151,13 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
 
     @property
     def media_image_remotely_accessible(self) -> bool:
-        """Return True — artwork URLs come from streaming service CDNs."""
-        return True
+        """Return whether HA can embed the image URL directly in the frontend.
+
+        Sendspin artwork is served from the local device (http://{device}/artwork),
+        which is a local HTTP URL. Setting False causes HA to proxy it server-side,
+        avoiding mixed-content blocks when HA is served over HTTPS.
+        """
+        return not self.coordinator.sendspin_active
 
     @property
     def media_content_type(self) -> MediaType:
