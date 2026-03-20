@@ -4,8 +4,8 @@ Home Assistant integration for the [TuneShine](https://tuneshine.rocks) LED albu
 ## Features
 
 - **Media player entity** — reflects the display state (playing, idle) and exposes current track, artist, album, and artwork
-- **Display mode sensor** — reports what is currently driving the display (`remote`, `local`, `following`, or `none`)
 - **Source media player** — select any HA media player to mirror; TuneShine automatically updates when the track changes and clears when playback stops
+- **Display mode sensor** — reports what is currently driving the display (`remote`, `local`, `following`, or `none`)
 - **Brightness controls** — set active and idle brightness (1–100, disabled by default)
 - **Entity services** — `send_image` and `clear_image` for automation use
 

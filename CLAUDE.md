@@ -1,0 +1,47 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What This Is
+
+A Home Assistant custom integration for the TuneShine LED album art display. The device exposes a local HTTP API discovered via mDNS (`_tuneshine._tcp.local.`). The integration polls the device every 10 seconds and supports source-following (mirroring a HA media player's artwork).
+
+There is no build system, test suite, or linter configured. Development means editing Python files and reloading in Home Assistant.
+
+## Deployment
+
+Install by copying `custom_components/tuneshine/` to the HA instance's `custom_components/` folder. Restart HA. The device auto-discovers via zeroconf or can be added manually by IP.
+
+To reload after changes without a full HA restart: **Settings → Devices & Services → TuneShine → (three dots) → Reload**.
+
+## Architecture
+
+All integration code lives in `custom_components/tuneshine/`.
+
+**Data flow:**
+1. `coordinator.py` (`TuneshineDataUpdateCoordinator`) polls `/state` every 10 seconds
+2. `api.py` (`TuneshineApiClient`) makes all HTTP calls; `TuneshineState` is the full parsed state
+3. Entities in `media_player.py`, `sensor.py`, `number.py`, `select.py` read from coordinator data
+4. `coordinator.display_mode` derives `DisplayMode` (FOLLOWING/LOCAL/REMOTE/NONE) from state
+
+**State model:** The device has no simple playing/stopped flag. State is inferred from `localMetadata` (HA-sent images) vs `remoteMetadata` (cloud/streaming). The media player entity reports `PLAYING` when `display_mode` is FOLLOWING or REMOTE, otherwise `IDLE`.
+
+**Source following:** When a source entity is configured, the coordinator subscribes to its state changes and sends the artwork URL to the device. Track changes are debounced (0.5s for playing, 2.0s for paused) to absorb brief idle flashes during track transitions. Image URLs are normalized to HTTP — relative paths get HA base URL prepended, HTTPS URLs are proxied through HA's media player proxy.
+
+**Optimistic updates:** `async_send_local_image()` and `async_clear_local_image()` update coordinator state immediately before device confirmation, then real state overwrites on next poll.
+
+**`always_update=False`** on the coordinator combined with `__eq__` on dataclasses means entity listeners only fire on actual state changes despite 10s polling.
+
+## Key Design Decisions
+
+- `_attr_name = None` on the media player → entity name equals device name with no "Media Player" suffix
+- Brightness entities are `entity_registry_enabled_default=False` (disabled by default)
+- Entity services (`send_image`, `clear_image`) registered via `platform.async_register_entity_service` in `media_player.py`
+- Always use IPv4: `str(discovery_info.ip_address)` not `.local` hostnames (avoids IPv6 slow-path)
+- `.local` hostnames in manual config are resolved to IPv4 at config flow time
+
+## API Reference
+
+See `.claude/api_reference.md` (not committed) for the TuneShine local HTTP API spec, known spec inaccuracies vs actual device behavior, and sample responses. Built against firmware 2.3.2.
+
+Key endpoints: `GET /health`, `GET /state`, `POST /image`, `DELETE /image`, `POST /brightness`.
