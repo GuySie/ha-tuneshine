@@ -52,6 +52,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         # before the device's /state response has been updated.  Cleared on every
         # poll so real device data always wins once it arrives.
         self.optimistic_local_metadata: ImageMetadata | None = None
+        self._last_remote_item_id: str | None = None
 
     async def _async_update_data(self) -> TuneshineState:
         """Fetch state from device."""
@@ -83,6 +84,22 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
                 title=current_name,
                 data={**self._entry.data, CONF_DEVICE_NAME: current_name},
             )
+
+        # Log when polling reveals a new remote track.
+        remote = state.remote_metadata
+        if remote and not remote.idle:
+            if remote.item_id != self._last_remote_item_id:
+                _LOGGER.debug(
+                    "New remote track detected: track=%r artist=%r album=%r service=%r item_id=%r",
+                    remote.track_name,
+                    remote.artist_name,
+                    remote.album_name,
+                    remote.service_name,
+                    remote.item_id,
+                )
+                self._last_remote_item_id = remote.item_id
+        else:
+            self._last_remote_item_id = None
 
         # Real device data has arrived — discard any optimistic state.
         self.optimistic_local_metadata = None

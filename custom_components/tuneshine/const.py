@@ -25,8 +25,8 @@ API_PATH_IMAGE = "/image"
 API_PATH_BRIGHTNESS = "/brightness"
 API_PATH_ARTWORK = "/artwork"
 
-# Poll every 30s — local device; always_update=False skips callbacks when data is unchanged.
-POLL_INTERVAL_SECONDS = 30
+# Poll every 10s — local device; always_update=False skips callbacks when data is unchanged.
+POLL_INTERVAL_SECONDS = 10
 
 ANIMATIONS = ["none", "dissolve", "crate", "crate_to_idle", "crate_from_idle"]
 
