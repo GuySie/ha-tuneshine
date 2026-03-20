@@ -209,11 +209,14 @@ class SendspinHandler:
             )
             if group_id is None:
                 await self._coordinator.async_on_sendspin_group_left()
+            elif playback_state == "stopped":
+                await self._coordinator.async_on_sendspin_group_joined(group_id, group_name)
+                await self._coordinator.async_on_sendspin_playback_stopped()
+            elif playback_state == "playing":
+                await self._coordinator.async_on_sendspin_group_joined(group_id, group_name)
+                await self._coordinator.async_on_sendspin_playback_resumed()
             else:
                 await self._coordinator.async_on_sendspin_group_joined(group_id, group_name)
-                if playback_state == "stopped":
-                    _LOGGER.debug("Sendspin group/update: playback stopped — clearing artwork")
-                    await self._coordinator.async_on_sendspin_stream_end()
 
         elif msg_type == "server/state":
             metadata = payload.get("metadata") or {}

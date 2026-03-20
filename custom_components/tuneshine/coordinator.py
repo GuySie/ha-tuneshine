@@ -77,6 +77,9 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         # Incremented on each artwork upload; used as a cache-bust query parameter
         # when setting imageUrl on the device to http://{host}/artwork?v=N.
         self._sendspin_track_counter: int = 0
+        # Last uploaded artwork bytes (WebP), retained across pause so we can
+        # re-upload on resume without waiting for the server to resend.
+        self._sendspin_cached_artwork: bytes | None = None
 
     async def _async_update_data(self) -> TuneshineState:
         """Fetch state from device."""
@@ -516,6 +519,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             _LOGGER.warning("Failed to convert Sendspin artwork to WebP: %s", err)
             return
         _LOGGER.debug("Converted to WebP: %d bytes", len(webp_bytes))
+        self._sendspin_cached_artwork = webp_bytes
         try:
             await self.client.async_send_image_binary(
                 image_bytes=webp_bytes,
@@ -547,11 +551,84 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         await self.async_request_refresh()
 
     async def async_on_sendspin_stream_end(self) -> None:
-        """Handle stream end — clear artwork if Sendspin is still active."""
+        """Handle stream end — clear artwork and cache if Sendspin is still active."""
         if not self._sendspin_active:
+            _LOGGER.debug("Sendspin stream/end ignored — not in a group")
             return
-        _LOGGER.debug("Sendspin stream/end received — clearing artwork")
+        _LOGGER.debug(
+            "Sendspin stream/end — clearing device image, cache (%s bytes), and metadata",
+            len(self._sendspin_cached_artwork) if self._sendspin_cached_artwork else "none",
+        )
+        self._sendspin_cached_artwork = None
+        self._sendspin_metadata = {}
         try:
             await self.async_clear_local_image()
         except TuneshineApiError as err:
             _LOGGER.warning("Failed to clear image on Sendspin stream end: %s", err)
+
+    async def async_on_sendspin_playback_stopped(self) -> None:
+        """Handle playback paused — blank the device but keep cached artwork for resume."""
+        if not self._sendspin_active:
+            _LOGGER.debug("Sendspin playback stopped ignored — not in a group")
+            return
+        _LOGGER.debug(
+            "Sendspin playback stopped — blanking device; cached artwork retained (%s bytes)",
+            len(self._sendspin_cached_artwork) if self._sendspin_cached_artwork else "none",
+        )
+        self.optimistic_local_metadata = None
+        self.async_update_listeners()
+        try:
+            await self.client.async_clear_image()
+            _LOGGER.debug("Sendspin playback stopped — device blanked successfully")
+        except TuneshineApiError as err:
+            _LOGGER.warning("Failed to blank device on Sendspin playback stop: %s", err)
+
+    async def async_on_sendspin_playback_resumed(self) -> None:
+        """Handle playback resumed — re-upload cached artwork if available."""
+        if not self._sendspin_active:
+            _LOGGER.debug("Sendspin playback resumed ignored — not in a group")
+            return
+        if not self._sendspin_cached_artwork:
+            _LOGGER.debug("Sendspin playback resumed — no cached artwork, nothing to restore")
+            return
+        self._sendspin_track_counter += 1
+        host_with_port = self.client._base_url.split("//", 1)[1]
+        artwork_url = f"http://{host_with_port}/artwork?v={self._sendspin_track_counter}"
+        meta = self._sendspin_metadata
+        _LOGGER.debug(
+            "Sendspin playback resumed — re-uploading cached artwork: %d bytes, "
+            "track=%r artist=%r album=%r counter=%d",
+            len(self._sendspin_cached_artwork),
+            meta.get("title"),
+            meta.get("artist"),
+            meta.get("album"),
+            self._sendspin_track_counter,
+        )
+        try:
+            await self.client.async_send_image_binary(
+                image_bytes=self._sendspin_cached_artwork,
+                track_name=meta.get("title"),
+                artist_name=meta.get("artist"),
+                album_name=meta.get("album"),
+                service_name=self._sendspin_group_name,
+            )
+            _LOGGER.debug("Sendspin playback resumed — artwork re-uploaded, artwork_url=%s", artwork_url)
+        except TuneshineApiError as err:
+            _LOGGER.warning("Failed to restore artwork on Sendspin resume: %s", err)
+            return
+        self.optimistic_local_metadata = ImageMetadata(
+            track_name=meta.get("title"),
+            artist_name=meta.get("artist"),
+            album_name=meta.get("album"),
+            service_name=self._sendspin_group_name,
+            sub_service_name=None,
+            item_id=str(self._sendspin_track_counter),
+            zone_name=None,
+            image_url=artwork_url,
+            content_type="track",
+            last_image_error=None,
+            idle=False,
+            account_name=None,
+        )
+        self.async_update_listeners()
+        await self.async_request_refresh()
