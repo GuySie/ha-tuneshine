@@ -5,6 +5,7 @@ Home Assistant integration for the [Tuneshine](https://tuneshine.rocks) LED albu
 
 - **Media player entity** — reflects the display state (playing, idle) and exposes current track, artist, album, and artwork
 - **Source media player** — select any HA media player to mirror; Tuneshine automatically updates when the track changes and clears when playback stops
+- **Sendspin client** — Supports the Sendspin protocol, displaying artwork and metadata
 - **Display mode sensor** — reports what is currently driving the display (`remote`, `local`, `following`, `sendspin`, or `none`)
 - **Brightness controls** — set active and idle brightness (1–100, disabled by default)
 - **Entity services** — `send_image` and `clear_image` for automation use
@@ -27,7 +28,7 @@ After setup, go to the Tuneshine device page and set **Source Entity** to any me
 
 The integration supports the [Sendspin](https://www.sendspin-audio.com/) protocol, allowing Sendspin servers such as [Music Assistant](https://www.music-assistant.io/player-support/sendspin/) to send artwork and metadata directly to the display.
 
-On startup, the integration advertises the device as a Sendspin client via mDNS (`_sendspin._tcp.local.`) and exposes a WebSocket endpoint on HA's HTTP server. When a Sendspin server adds the device to a group:
+On startup, the integration advertises the device as a Sendspin client via mDNS (`_sendspin._tcp.local.`) and exposes a WebSocket endpoint on Home Assistant's HTTP server. When a Sendspin server adds the device to a group:
 
 - Artwork is received over the Sendspin stream and pushed to the display
 - Track, artist, and album metadata updates the media player entity in real time

@@ -477,6 +477,20 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             account_name=None,
         )
         self.async_update_listeners()
+        # Push metadata to the device immediately if a local image already exists
+        # (from a previous Sendspin track). This keeps /state current without waiting
+        # for artwork. The device returns 409 if no local image is set — that's fine,
+        # artwork will carry the metadata when it arrives.
+        if existing and existing.image_url:
+            try:
+                await self.client.async_update_metadata(
+                    track_name=metadata.get("title"),
+                    artist_name=metadata.get("artist"),
+                    album_name=metadata.get("album"),
+                    service_name=self._sendspin_group_name,
+                )
+            except TuneshineApiError as err:
+                _LOGGER.debug("Sendspin metadata-only update skipped: %s", err)
 
     async def async_on_sendspin_artwork(self, image_bytes: bytes) -> None:
         """Upload incoming artwork binary to the device and update entity state."""

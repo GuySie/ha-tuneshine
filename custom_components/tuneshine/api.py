@@ -184,6 +184,28 @@ class TuneshineApiClient:
             body["animation"] = animation
         await self._request("POST", API_PATH_IMAGE, json=body)
 
+    async def async_update_metadata(
+        self,
+        track_name: str | None = None,
+        artist_name: str | None = None,
+        album_name: str | None = None,
+        service_name: str | None = None,
+    ) -> None:
+        """POST /image with no imageUrl — update metadata on the existing local image.
+
+        Raises TuneshineApiError with status 409 if no local image is currently set.
+        """
+        body: dict[str, object] = {}
+        if track_name is not None:
+            body["trackName"] = track_name
+        if artist_name is not None:
+            body["artistName"] = artist_name
+        if album_name is not None:
+            body["albumName"] = album_name
+        if service_name is not None:
+            body["serviceName"] = service_name
+        await self._request("POST", API_PATH_IMAGE, json=body)
+
     async def async_clear_image(self) -> None:
         """DELETE /image — remove locally-provided image."""
         await self._request("DELETE", API_PATH_IMAGE)
