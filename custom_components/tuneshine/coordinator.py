@@ -35,7 +35,7 @@ def _convert_to_webp(image_bytes: bytes) -> bytes:
 
     with Image.open(io.BytesIO(image_bytes)) as img:
         out = io.BytesIO()
-        img.save(out, format="WEBP")
+        img.save(out, format="WEBP", lossless=True)
         return out.getvalue()
 
 
