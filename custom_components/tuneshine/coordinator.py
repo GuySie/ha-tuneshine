@@ -34,6 +34,7 @@ def _convert_to_webp(image_bytes: bytes) -> bytes:
     from PIL import Image  # noqa: PLC0415 — lazy import; Pillow is an HA dependency
 
     with Image.open(io.BytesIO(image_bytes)) as img:
+        img = img.resize((64, 64), Image.LANCZOS)
         out = io.BytesIO()
         img.save(out, format="WEBP", lossless=True)
         return out.getvalue()

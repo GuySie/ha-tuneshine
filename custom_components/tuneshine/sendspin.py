@@ -132,8 +132,8 @@ class SendspinHandler:
                         {
                             "source": "album",
                             "format": "jpeg",
-                            "media_width": 64,
-                            "media_height": 64,
+                            "media_width": 512,
+                            "media_height": 512,
                         }
                     ]
                 },

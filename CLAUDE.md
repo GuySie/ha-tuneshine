@@ -6,13 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Home Assistant custom integration for the Tuneshine LED album art display. The device exposes a local HTTP API discovered via mDNS (`_tuneshine._tcp.local.`). The integration polls the device every 10 seconds and supports source-following (mirroring a HA media player's artwork).
 
-There is no build system, test suite, or linter configured. Development means editing Python files and reloading in Home Assistant.
+There is no build system, test suite, or linter configured. Development means editing Python files and restarting Home Assistant.
 
 ## Deployment
 
 Install by copying `custom_components/tuneshine/` to the HA instance's `custom_components/` folder. Restart HA. The device auto-discovers via zeroconf or can be added manually by IP.
 
-To reload after changes without a full HA restart: **Settings → Devices & Services → Tuneshine → (three dots) → Reload**.
+Testing Python code changes requires a **full HA restart** (Settings → System → Restart) — Python caches imported modules, so the "Reload" option in the UI does not pick up `.py` file changes.
 
 ## Architecture
 
