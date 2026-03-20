@@ -1,4 +1,4 @@
-"""TuneShine sensor entities."""
+"""Tuneshine sensor entities."""
 from __future__ import annotations
 
 from homeassistant.components.sensor import SensorEntity
@@ -15,13 +15,13 @@ async def async_setup_entry(
     entry: TuneshineConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up TuneShine sensor entities from a config entry."""
+    """Set up Tuneshine sensor entities from a config entry."""
     coordinator: TuneshineDataUpdateCoordinator = entry.runtime_data
     async_add_entities([TuneshineDisplayModeSensor(coordinator)])
 
 
 class TuneshineDisplayModeSensor(TuneshineEntity, SensorEntity):
-    """Sensor reporting how the TuneShine display is currently being driven."""
+    """Sensor reporting how the Tuneshine display is currently being driven."""
 
     _attr_translation_key = "display_mode"
 

@@ -1,4 +1,4 @@
-"""TuneShine media player entity."""
+"""Tuneshine media player entity."""
 from __future__ import annotations
 
 from typing import Any
@@ -34,7 +34,7 @@ from .const import (
 from .coordinator import TuneshineDataUpdateCoordinator
 from .entity import TuneshineConfigEntry, TuneshineEntity
 
-# Map TuneShine contentType strings to HA MediaType enum values.
+# Map Tuneshine contentType strings to HA MediaType enum values.
 _CONTENT_TYPE_MAP: dict[str, MediaType] = {
     "track": MediaType.MUSIC,
     "podcast": MediaType.PODCAST,
@@ -49,7 +49,7 @@ async def async_setup_entry(
     entry: TuneshineConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up TuneShine media player from a config entry."""
+    """Set up Tuneshine media player from a config entry."""
     coordinator: TuneshineDataUpdateCoordinator = entry.runtime_data
     async_add_entities([TuneshineMediaPlayer(coordinator)])
 
@@ -76,9 +76,9 @@ async def async_setup_entry(
 
 
 class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
-    """Representation of a TuneShine LED display as a media player."""
+    """Representation of a Tuneshine LED display as a media player."""
 
-    # No suffix — entity name is just the device name ("TuneShine").
+    # No suffix — entity name is just the device name ("Tuneshine").
     _attr_name = None
     _attr_supported_features = MediaPlayerEntityFeature.PLAY_MEDIA
 

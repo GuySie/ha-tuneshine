@@ -1,9 +1,9 @@
-"""Constants for the TuneShine integration."""
+"""Constants for the Tuneshine integration."""
 from enum import StrEnum
 
 
 class DisplayMode(StrEnum):
-    """Possible states for the TuneShine display mode sensor."""
+    """Possible states for the Tuneshine display mode sensor."""
 
     FOLLOWING = "following"
     LOCAL = "local"
@@ -12,7 +12,7 @@ class DisplayMode(StrEnum):
 
 
 DOMAIN = "tuneshine"
-MANUFACTURER = "TuneShine"
+MANUFACTURER = "Tuneshine"
 DEFAULT_PORT = 80
 
 CONF_DEVICE_NAME = "device_name"

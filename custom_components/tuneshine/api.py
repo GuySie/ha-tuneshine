@@ -1,4 +1,4 @@
-"""TuneShine local HTTP API client."""
+"""Tuneshine local HTTP API client."""
 from __future__ import annotations
 
 import asyncio
@@ -17,7 +17,7 @@ from .const import (
 
 
 class TuneshineApiError(Exception):
-    """Base exception for TuneShine API errors."""
+    """Base exception for Tuneshine API errors."""
 
 
 class TuneshineConnectionError(TuneshineApiError):
@@ -104,7 +104,7 @@ def _parse_state(data: dict) -> TuneshineState:
 
 
 class TuneshineApiClient:
-    """Async HTTP client for the TuneShine local API."""
+    """Async HTTP client for the Tuneshine local API."""
 
     def __init__(
         self,
@@ -142,11 +142,11 @@ class TuneshineApiClient:
                 return {}
         except aiohttp.ClientError as err:
             raise TuneshineConnectionError(
-                f"Connection error communicating with TuneShine: {err}"
+                f"Connection error communicating with Tuneshine: {err}"
             ) from err
         except asyncio.TimeoutError as err:
             raise TuneshineConnectionError(
-                f"Timeout communicating with TuneShine at {self._base_url}"
+                f"Timeout communicating with Tuneshine at {self._base_url}"
             ) from err
 
     async def async_health_check(self) -> None:

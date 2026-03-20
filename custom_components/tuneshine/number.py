@@ -1,4 +1,4 @@
-"""TuneShine brightness number entities."""
+"""Tuneshine brightness number entities."""
 from __future__ import annotations
 
 from collections.abc import Callable, Coroutine
@@ -55,7 +55,7 @@ async def async_setup_entry(
     entry: TuneshineConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up TuneShine number entities from a config entry."""
+    """Set up Tuneshine number entities from a config entry."""
     coordinator: TuneshineDataUpdateCoordinator = entry.runtime_data
     async_add_entities(
         TuneshineNumberEntity(coordinator, description) for description in NUMBERS
@@ -63,7 +63,7 @@ async def async_setup_entry(
 
 
 class TuneshineNumberEntity(TuneshineEntity, NumberEntity):
-    """A number entity for a TuneShine brightness setting."""
+    """A number entity for a Tuneshine brightness setting."""
 
     entity_description: TuneshineNumberEntityDescription
 

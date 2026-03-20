@@ -1,4 +1,4 @@
-"""Config flow for TuneShine."""
+"""Config flow for Tuneshine."""
 from __future__ import annotations
 
 import socket
@@ -18,7 +18,7 @@ from .const import CONF_DEVICE_NAME, CONF_SOURCE_ENTITY_ID, DOMAIN
 
 
 class TuneshineConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for TuneShine."""
+    """Handle a config flow for Tuneshine."""
 
     VERSION = 1
 
@@ -57,7 +57,7 @@ class TuneshineConfigFlow(ConfigFlow, domain=DOMAIN):
 
         self._host = host
         self._hardware_id = state.hardware_id
-        self._device_name = state.name or f"TuneShine {state.hardware_id[-4:]}"
+        self._device_name = state.name or f"Tuneshine {state.hardware_id[-4:]}"
 
         self.context["title_placeholders"] = {
             "name": self._device_name,
@@ -121,7 +121,7 @@ class TuneshineConfigFlow(ConfigFlow, domain=DOMAIN):
                     self._host = host
                     self._hardware_id = state.hardware_id
                     self._device_name = (
-                        state.name or f"TuneShine {state.hardware_id[-4:]}"
+                        state.name or f"Tuneshine {state.hardware_id[-4:]}"
                     )
                     return self._async_create_entry()
 
@@ -150,7 +150,7 @@ _OPTIONS_SCHEMA = vol.Schema({
 
 
 class TuneshineOptionsFlow(OptionsFlowWithReload):
-    """Handle TuneShine options."""
+    """Handle Tuneshine options."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

@@ -1,4 +1,4 @@
-"""Select entity for TuneShine source media player."""
+"""Select entity for Tuneshine source media player."""
 from __future__ import annotations
 
 from homeassistant.components.select import SelectEntity
@@ -24,7 +24,7 @@ async def async_setup_entry(
 
 
 class TuneshineSourceSelectEntity(TuneshineEntity, SelectEntity):
-    """Select entity to choose a source media player to mirror on TuneShine."""
+    """Select entity to choose a source media player to mirror on Tuneshine."""
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_icon = "mdi:television-play"

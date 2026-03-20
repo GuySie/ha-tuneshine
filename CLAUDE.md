@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Home Assistant custom integration for the TuneShine LED album art display. The device exposes a local HTTP API discovered via mDNS (`_tuneshine._tcp.local.`). The integration polls the device every 10 seconds and supports source-following (mirroring a HA media player's artwork).
+A Home Assistant custom integration for the Tuneshine LED album art display. The device exposes a local HTTP API discovered via mDNS (`_tuneshine._tcp.local.`). The integration polls the device every 10 seconds and supports source-following (mirroring a HA media player's artwork).
 
 There is no build system, test suite, or linter configured. Development means editing Python files and reloading in Home Assistant.
 
@@ -12,7 +12,7 @@ There is no build system, test suite, or linter configured. Development means ed
 
 Install by copying `custom_components/tuneshine/` to the HA instance's `custom_components/` folder. Restart HA. The device auto-discovers via zeroconf or can be added manually by IP.
 
-To reload after changes without a full HA restart: **Settings → Devices & Services → TuneShine → (three dots) → Reload**.
+To reload after changes without a full HA restart: **Settings → Devices & Services → Tuneshine → (three dots) → Reload**.
 
 ## Architecture
 
@@ -42,6 +42,6 @@ All integration code lives in `custom_components/tuneshine/`.
 
 ## API Reference
 
-See `.claude/api_reference.md` (not committed) for the TuneShine local HTTP API spec, known spec inaccuracies vs actual device behavior, and sample responses. Built against firmware 2.3.2.
+See `.claude/api_reference.md` (not committed) for the Tuneshine local HTTP API spec, known spec inaccuracies vs actual device behavior, and sample responses. Built against firmware 2.3.2.
 
 Key endpoints: `GET /health`, `GET /state`, `POST /image`, `DELETE /image`, `POST /brightness`.

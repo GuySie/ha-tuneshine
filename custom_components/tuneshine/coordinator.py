@@ -1,4 +1,4 @@
-"""DataUpdateCoordinator for TuneShine."""
+"""DataUpdateCoordinator for Tuneshine."""
 from __future__ import annotations
 
 import asyncio
@@ -24,7 +24,7 @@ _NON_PLAYING_STATES = frozenset({
 
 
 class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
-    """Coordinator for a single TuneShine device."""
+    """Coordinator for a single Tuneshine device."""
 
     def __init__(
         self,
@@ -56,13 +56,13 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
 
     async def _async_update_data(self) -> TuneshineState:
         """Fetch state from device."""
-        _LOGGER.debug("Polling TuneShine device state")
+        _LOGGER.debug("Polling Tuneshine device state")
         try:
             state = await self.client.async_get_state()
         except TuneshineConnectionError as err:
-            _LOGGER.debug("Connection error polling TuneShine: %s", err)
+            _LOGGER.debug("Connection error polling Tuneshine: %s", err)
             raise UpdateFailed(
-                f"Error communicating with TuneShine device: {err}"
+                f"Error communicating with Tuneshine device: {err}"
             ) from err
 
         _LOGGER.debug(
@@ -291,11 +291,11 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
                     image_url,
                 )
                 if image_url is None:
-                    _LOGGER.debug("Source player has no image, clearing TuneShine")
+                    _LOGGER.debug("Source player has no image, clearing Tuneshine")
                     await self.async_clear_local_image()
                 else:
                     _LOGGER.debug(
-                        "Sending image to TuneShine: url=%s track=%r artist=%r album=%r service=%r",
+                        "Sending image to Tuneshine: url=%s track=%r artist=%r album=%r service=%r",
                         image_url,
                         state.attributes.get("media_title"),
                         state.attributes.get("media_artist"),
@@ -312,16 +312,16 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             else:
                 _LOGGER.debug("Source player in unhandled state %r, no action taken", state.state)
         except TuneshineApiError as err:
-            _LOGGER.warning("Failed to update TuneShine from source player: %s", err)
+            _LOGGER.warning("Failed to update Tuneshine from source player: %s", err)
             return
 
     def _get_image_url(self, state: State) -> str | None:
         """Return an http:// image URL for the media player's current artwork.
 
-        TuneShine only accepts http:// URLs. Relative entity_picture paths
+        Tuneshine only accepts http:// URLs. Relative entity_picture paths
         (the HA proxy) and plain http:// URLs are used directly. https:// URLs
         (e.g. Spotify CDN, where media_image_remotely_accessible=True) are
-        routed through HA's public media player proxy endpoint so TuneShine
+        routed through HA's public media player proxy endpoint so Tuneshine
         receives an http:// address.
         """
         # Prefer entity_picture_local — some integrations (e.g. Music Assistant)
@@ -359,7 +359,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             _LOGGER.debug("_get_image_url: plain http URL -> %s", entity_picture)
             return entity_picture
 
-        # https:// — TuneShine rejects https://.
+        # https:// — Tuneshine rejects https://.
         # Route through HA's media player proxy using the access_token.
         if entity_picture.startswith("https://"):
             access_token = state.attributes.get("access_token")

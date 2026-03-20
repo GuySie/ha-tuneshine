@@ -1,4 +1,4 @@
-"""The TuneShine integration."""
+"""The Tuneshine integration."""
 from __future__ import annotations
 
 from homeassistant.const import CONF_HOST, Platform
@@ -14,7 +14,7 @@ PLATFORMS: list[Platform] = [Platform.MEDIA_PLAYER, Platform.NUMBER, Platform.SE
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: TuneshineConfigEntry) -> bool:
-    """Set up TuneShine from a config entry."""
+    """Set up Tuneshine from a config entry."""
     session = async_get_clientsession(hass)
     client = TuneshineApiClient(entry.data[CONF_HOST], session)
     coordinator = TuneshineDataUpdateCoordinator(hass, client, entry)
@@ -32,5 +32,5 @@ async def async_setup_entry(hass: HomeAssistant, entry: TuneshineConfigEntry) ->
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: TuneshineConfigEntry) -> bool:
-    """Unload a TuneShine config entry."""
+    """Unload a Tuneshine config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

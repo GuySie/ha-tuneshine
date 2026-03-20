@@ -1,6 +1,6 @@
 {
   "domain": "tuneshine",
-  "name": "TuneShine",
+  "name": "Tuneshine",
   "version": "1.0.0",
   "config_flow": true,
   "integration_type": "device",

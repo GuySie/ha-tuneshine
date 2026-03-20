@@ -2,16 +2,16 @@
   "config": {
     "step": {
       "user": {
-        "title": "Set up TuneShine",
+        "title": "Set up Tuneshine",
         "data": {
           "host": "Host or IP address"
         },
         "data_description": {
-          "host": "The IP address or hostname of your TuneShine device (e.g. 192.168.1.100 or tuneshine-E0C4.local)"
+          "host": "The IP address or hostname of your Tuneshine device (e.g. 192.168.1.100 or tuneshine-E0C4.local)"
         }
       },
       "zeroconf_confirm": {
-        "title": "Discovered TuneShine",
+        "title": "Discovered Tuneshine",
         "description": "Found **{name}** at `{host}`. Add it to Home Assistant?"
       }
     },
@@ -27,12 +27,12 @@
   "options": {
     "step": {
       "init": {
-        "title": "TuneShine options",
+        "title": "Tuneshine options",
         "data": {
           "source_entity_id": "Source media player"
         },
         "data_description": {
-          "source_entity_id": "Mirror cover art and metadata from this media player onto TuneShine. Leave empty to use only TuneShine's own music source."
+          "source_entity_id": "Mirror cover art and metadata from this media player onto Tuneshine. Leave empty to use only Tuneshine's own music source."
         }
       }
     }
@@ -69,7 +69,7 @@
   "services": {
     "send_image": {
       "name": "Send Image",
-      "description": "Display an image on the TuneShine LED display.",
+      "description": "Display an image on the Tuneshine LED display.",
       "fields": {
         "image_url": {
           "name": "Image URL",
