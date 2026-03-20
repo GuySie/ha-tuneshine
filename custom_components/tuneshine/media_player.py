@@ -27,6 +27,7 @@ from .const import (
     ATTR_IMAGE_URL,
     ATTR_SERVICE_NAME,
     ATTR_TRACK_NAME,
+    DisplayMode,
     SERVICE_CLEAR_IMAGE,
     SERVICE_SEND_IMAGE,
 )
@@ -93,16 +94,7 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
     @property
     def state(self) -> MediaPlayerState:
         """Return the playback state."""
-        data = self.coordinator.data
-        local = self.coordinator.optimistic_local_metadata or data.local_metadata
-        if local is not None and not local.idle:
-            # HA sent an image. If we're following a source player, that means
-            # music is actively playing — return PLAYING. For manually sent
-            # static images (no source), treat the display as IDLE.
-            if self.coordinator.has_source:
-                return MediaPlayerState.PLAYING
-            return MediaPlayerState.IDLE
-        if data.remote_metadata is not None and not data.remote_metadata.idle:
+        if self.coordinator.display_mode in (DisplayMode.FOLLOWING, DisplayMode.REMOTE):
             return MediaPlayerState.PLAYING
         return MediaPlayerState.IDLE
 
@@ -176,15 +168,7 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes for automations."""
         data = self.coordinator.data
-        local = self.coordinator.optimistic_local_metadata or data.local_metadata
-        if local and not local.idle:
-            display_mode = "local"
-        elif data.remote_metadata and not data.remote_metadata.idle:
-            display_mode = "remote"
-        else:
-            display_mode = "none"
-
-        attrs: dict[str, Any] = {"display_mode": display_mode}
+        attrs: dict[str, Any] = {}
         if data.remote_metadata:
             if data.remote_metadata.item_id:
                 attrs["item_id"] = data.remote_metadata.item_id

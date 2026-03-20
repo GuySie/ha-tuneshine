@@ -10,7 +10,7 @@ from .const import CONF_SOURCE_ENTITY_ID
 from .coordinator import TuneshineDataUpdateCoordinator
 from .entity import TuneshineConfigEntry
 
-PLATFORMS: list[Platform] = [Platform.MEDIA_PLAYER, Platform.NUMBER, Platform.SELECT]
+PLATFORMS: list[Platform] = [Platform.MEDIA_PLAYER, Platform.NUMBER, Platform.SELECT, Platform.SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: TuneshineConfigEntry) -> bool:

@@ -1,4 +1,15 @@
 """Constants for the TuneShine integration."""
+from enum import StrEnum
+
+
+class DisplayMode(StrEnum):
+    """Possible states for the TuneShine display mode sensor."""
+
+    FOLLOWING = "following"
+    LOCAL = "local"
+    REMOTE = "remote"
+    NONE = "none"
+
 
 DOMAIN = "tuneshine"
 MANUFACTURER = "TuneShine"

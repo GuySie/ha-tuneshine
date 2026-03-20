@@ -38,6 +38,17 @@
     }
   },
   "entity": {
+    "sensor": {
+      "display_mode": {
+        "name": "Display Mode",
+        "state": {
+          "following": "Following",
+          "local": "Local",
+          "remote": "Remote",
+          "none": "None"
+        }
+      }
+    },
     "select": {
       "source_entity": {
         "name": "Source Media Player",

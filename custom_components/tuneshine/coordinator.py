@@ -14,7 +14,7 @@ from homeassistant.helpers.network import NoURLAvailableError, get_url
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import ImageMetadata, TuneshineApiClient, TuneshineApiError, TuneshineConnectionError, TuneshineState
-from .const import CONF_DEVICE_NAME, DOMAIN, POLL_INTERVAL_SECONDS
+from .const import CONF_DEVICE_NAME, DOMAIN, POLL_INTERVAL_SECONDS, DisplayMode
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -207,6 +207,16 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
     def has_source(self) -> bool:
         """Return True when actively following a source media player."""
         return self._source_unsub is not None
+
+    @property
+    def display_mode(self) -> DisplayMode:
+        """Return how the display is currently being driven."""
+        local = self.optimistic_local_metadata or self.data.local_metadata
+        if local and not local.idle:
+            return DisplayMode.FOLLOWING if self.has_source else DisplayMode.LOCAL
+        if self.data.remote_metadata and not self.data.remote_metadata.idle:
+            return DisplayMode.REMOTE
+        return DisplayMode.NONE
 
     @callback
     def async_cleanup_source_listener(self) -> None:
