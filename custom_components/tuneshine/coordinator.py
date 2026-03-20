@@ -17,7 +17,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 import io
 
 from .api import ImageMetadata, TuneshineApiClient, TuneshineApiError, TuneshineConnectionError, TuneshineState
-from .const import CONF_DEVICE_NAME, CONF_SOURCE_ENTITY_ID, DOMAIN, POLL_INTERVAL_SECONDS, DisplayMode
+from .const import API_PATH_ARTWORK, CONF_DEVICE_NAME, CONF_SOURCE_ENTITY_ID, DOMAIN, POLL_INTERVAL_SECONDS, DisplayMode
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -282,6 +282,14 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             return DisplayMode.REMOTE
         return DisplayMode.NONE
 
+    def _artwork_url(self) -> str:
+        """Return an http:// URL pointing at the device's /artwork endpoint.
+
+        The ?v= counter acts as a cache-bust so HA re-fetches on each track change.
+        """
+        host_with_port = self.client._base_url[len("http://"):]
+        return f"http://{host_with_port}{API_PATH_ARTWORK}?v={self._sendspin_track_counter}"
+
     @callback
     def async_cleanup_source_listener(self) -> None:
         """Unsubscribe from the source media player state listener."""
@@ -505,10 +513,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
     async def async_on_sendspin_artwork(self, image_bytes: bytes) -> None:
         """Upload incoming artwork binary to the device and update entity state."""
         self._sendspin_track_counter += 1
-        # Build an http:// URL pointing at the device's own /artwork endpoint.
-        # The ?v= parameter acts as a cache-bust so HA re-fetches on each track change.
-        host_with_port = self.client._base_url.split("//", 1)[1]
-        artwork_url = f"http://{host_with_port}/artwork?v={self._sendspin_track_counter}"
+        artwork_url = self._artwork_url()
         meta = self._sendspin_metadata
         _LOGGER.debug(
             "Sendspin artwork received (%d bytes), converting to WebP — track=%r artist=%r",
@@ -599,8 +604,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             _LOGGER.debug("Sendspin playback resumed — no cached artwork, nothing to restore")
             return
         self._sendspin_track_counter += 1
-        host_with_port = self.client._base_url.split("//", 1)[1]
-        artwork_url = f"http://{host_with_port}/artwork?v={self._sendspin_track_counter}"
+        artwork_url = self._artwork_url()
         meta = self._sendspin_metadata
         _LOGGER.debug(
             "Sendspin playback resumed — re-uploading cached artwork: %d bytes, "
