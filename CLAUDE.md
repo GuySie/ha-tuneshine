@@ -45,3 +45,5 @@ All integration code lives in `custom_components/tuneshine/`.
 See `.claude/api_reference.md` (not committed) for the Tuneshine local HTTP API spec, known spec inaccuracies vs actual device behavior, and sample responses. Built against firmware 2.3.2.
 
 Key endpoints: `GET /health`, `GET /state`, `POST /image`, `DELETE /image`, `POST /brightness`.
+
+See `.claude/sendspin_reference.md` (not committed) for the Sendspin protocol spec, including message types, delta semantics, binary message structure, and Tuneshine-specific implementation notes.

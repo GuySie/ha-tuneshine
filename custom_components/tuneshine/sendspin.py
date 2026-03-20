@@ -10,6 +10,7 @@ followed by the raw image payload (JPEG for ARTWORK_CHANNEL_0, type=8).
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import struct
@@ -87,6 +88,8 @@ class SendspinHandler:
 
         await self._send_client_hello(hardware_id, device_name)
 
+        _LOGGER.debug("Sendspin: starting client/time background task for %s", hardware_id)
+        time_task = asyncio.create_task(self._client_time_loop(hardware_id))
         try:
             async for msg in self._ws:
                 if msg.type == web.WSMsgType.TEXT:
@@ -103,7 +106,10 @@ class SendspinHandler:
         except Exception:
             _LOGGER.exception("Unexpected error in Sendspin handler for %s", hardware_id)
         finally:
+            _LOGGER.debug("Sendspin: cancelling client/time background task for %s", hardware_id)
+            time_task.cancel()
             _LOGGER.debug("Sendspin connection closed for device %s", hardware_id)
+            await self._send_client_goodbye()
             # If we were in a group when the connection dropped, leave gracefully.
             if self._coordinator.sendspin_active:
                 _LOGGER.debug(
@@ -146,6 +152,32 @@ class SendspinHandler:
         await self._ws.send_str(json.dumps(msg))
         _LOGGER.debug("Sent client/time: client_transmitted=%d", ts)
 
+    async def _client_time_loop(self, hardware_id: str) -> None:
+        """Send client/time continuously for clock synchronisation."""
+        try:
+            while True:
+                await asyncio.sleep(5)
+                if self._ws.closed:
+                    _LOGGER.debug("Sendspin: client/time loop stopping — WebSocket closed for %s", hardware_id)
+                    break
+                await self._send_client_time()
+        except asyncio.CancelledError:
+            _LOGGER.debug("Sendspin: client/time loop cancelled for %s", hardware_id)
+        except Exception:
+            _LOGGER.debug("Sendspin: client/time loop ended unexpectedly for %s", hardware_id, exc_info=True)
+
+    async def _send_client_goodbye(self) -> None:
+        """Send client/goodbye before closing."""
+        if self._ws.closed:
+            _LOGGER.debug("Sendspin: skipping client/goodbye — WebSocket already closed")
+            return
+        try:
+            msg = {"type": "client/goodbye", "payload": {"reason": "shutdown"}}
+            await self._ws.send_str(json.dumps(msg))
+            _LOGGER.debug("Sent client/goodbye")
+        except Exception:
+            _LOGGER.debug("Sendspin: failed to send client/goodbye", exc_info=True)
+
     async def _handle_text(self, data: str) -> None:
         """Dispatch an incoming JSON text message by type."""
         try:
@@ -175,23 +207,35 @@ class SendspinHandler:
                 group_name,
                 playback_state,
             )
-            if group_id is not None:
-                await self._coordinator.async_on_sendspin_group_joined(group_id, group_name)
-            else:
+            if group_id is None:
                 await self._coordinator.async_on_sendspin_group_left()
+            else:
+                await self._coordinator.async_on_sendspin_group_joined(group_id, group_name)
+                if playback_state == "stopped":
+                    _LOGGER.debug("Sendspin group/update: playback stopped — clearing artwork")
+                    await self._coordinator.async_on_sendspin_stream_end()
 
         elif msg_type == "server/state":
             metadata = payload.get("metadata") or {}
+            playback_state = payload.get("playback_state")
             _LOGGER.debug(
                 "Sendspin server/state: has_metadata=%s playback_state=%r",
                 bool(metadata),
-                payload.get("playback_state"),
+                playback_state,
             )
             if metadata:
                 await self._coordinator.async_on_sendspin_metadata(metadata)
+            elif "metadata" in payload and payload["metadata"] is None:
+                # Explicit null — delta semantics say clear the field.
+                _LOGGER.debug("Sendspin server/state: metadata explicitly null — clearing artwork")
+                await self._coordinator.async_on_sendspin_stream_end()
 
         elif msg_type == "stream/end":
             _LOGGER.debug("Sendspin stream/end received")
+            await self._coordinator.async_on_sendspin_stream_end()
+
+        elif msg_type == "stream/clear":
+            _LOGGER.debug("Sendspin stream/clear received — clearing artwork")
             await self._coordinator.async_on_sendspin_stream_end()
 
         else:
@@ -208,9 +252,10 @@ class SendspinHandler:
         if msg_type == _ARTWORK_CHANNEL_0:
             image_bytes = data[_BINARY_HEADER_SIZE:]
             if image_bytes:
-                _LOGGER.debug(
-                    "Sendspin: received artwork (%d bytes)", len(image_bytes)
-                )
+                _LOGGER.debug("Sendspin: received artwork (%d bytes)", len(image_bytes))
                 await self._coordinator.async_on_sendspin_artwork(image_bytes)
+            else:
+                _LOGGER.debug("Sendspin: received artwork clear (empty payload)")
+                await self._coordinator.async_on_sendspin_stream_end()
         else:
             _LOGGER.debug("Sendspin: ignoring binary message type %d", msg_type)
