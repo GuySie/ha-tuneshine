@@ -4,7 +4,6 @@ DOMAIN = "tuneshine"
 MANUFACTURER = "TuneShine"
 DEFAULT_PORT = 80
 
-CONF_DEVICE_ID = "device_id"
 CONF_DEVICE_NAME = "device_name"
 CONF_SOURCE_ENTITY_ID = "source_entity_id"
 
@@ -15,8 +14,7 @@ API_PATH_IMAGE = "/image"
 API_PATH_BRIGHTNESS = "/brightness"
 API_PATH_ARTWORK = "/artwork"
 
-# Poll every 10s — local device, cheap; timely enough for track changes.
-# always_update=False means the coordinator skips callbacks when data is unchanged.
+# Poll every 30s — local device; always_update=False skips callbacks when data is unchanged.
 POLL_INTERVAL_SECONDS = 30
 
 ANIMATIONS = ["none", "dissolve", "crate", "crate_to_idle", "crate_from_idle"]

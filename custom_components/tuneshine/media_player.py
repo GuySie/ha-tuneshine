@@ -102,10 +102,8 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
             if self.coordinator.has_source:
                 return MediaPlayerState.PLAYING
             return MediaPlayerState.IDLE
-        if data.remote_metadata is not None:
-            if not data.remote_metadata.idle:
-                return MediaPlayerState.PLAYING
-            return MediaPlayerState.IDLE
+        if data.remote_metadata is not None and not data.remote_metadata.idle:
+            return MediaPlayerState.PLAYING
         return MediaPlayerState.IDLE
 
     # ------------------------------------------------------------------

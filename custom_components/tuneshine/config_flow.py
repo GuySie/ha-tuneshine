@@ -14,7 +14,7 @@ from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 from .api import TuneshineApiClient, TuneshineConnectionError
-from .const import CONF_DEVICE_ID, CONF_DEVICE_NAME, CONF_SOURCE_ENTITY_ID, DOMAIN
+from .const import CONF_DEVICE_NAME, CONF_SOURCE_ENTITY_ID, DOMAIN
 
 
 class TuneshineConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -137,7 +137,6 @@ class TuneshineConfigFlow(ConfigFlow, domain=DOMAIN):
             title=self._device_name,
             data={
                 CONF_HOST: self._host,
-                CONF_DEVICE_ID: self._hardware_id,
                 CONF_DEVICE_NAME: self._device_name,
             },
         )

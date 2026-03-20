@@ -181,7 +181,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
                 self._debounce_unsub = None
 
             # Use a longer debounce for non-playing states to absorb the brief
-            # idle flash that some players (e.g. HomePod) emit during track changes.
+            # idle flash that some players emit during track changes.
             is_playing = new_state is not None and new_state.state not in _NON_PLAYING_STATES
             delay = 0.5 if is_playing else 2.0
             _LOGGER.debug("Scheduling debounced handler (%.1f s, state=%s)", delay, new_state.state if new_state else "none")
