@@ -6,6 +6,7 @@ import logging
 from collections.abc import Callable
 from datetime import timedelta
 
+from homeassistant.components.media_player import MediaPlayerState
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State, callback
@@ -21,7 +22,12 @@ from .const import CONF_DEVICE_NAME, CONF_SOURCE_ENTITY_ID, DOMAIN, POLL_INTERVA
 _LOGGER = logging.getLogger(__name__)
 
 _NON_PLAYING_STATES = frozenset({
-    STATE_UNAVAILABLE, STATE_UNKNOWN, "off", "idle", "paused", "standby"
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
+    MediaPlayerState.OFF,
+    MediaPlayerState.IDLE,
+    MediaPlayerState.PAUSED,
+    MediaPlayerState.STANDBY,
 })
 
 

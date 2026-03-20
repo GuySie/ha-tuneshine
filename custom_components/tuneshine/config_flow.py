@@ -1,8 +1,11 @@
 """Config flow for Tuneshine."""
 from __future__ import annotations
 
+import logging
 import socket
 from typing import Any
+
+_LOGGER = logging.getLogger(__name__)
 
 import voluptuous as vol
 
@@ -13,7 +16,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
-from .api import TuneshineApiClient, TuneshineConnectionError
+from .api import TuneshineApiClient, TuneshineApiError
 from .const import CONF_DEVICE_NAME, CONF_SOURCE_ENTITY_ID, DOMAIN
 
 
@@ -48,7 +51,7 @@ class TuneshineConfigFlow(ConfigFlow, domain=DOMAIN):
         try:
             await client.async_health_check()
             state = await client.async_get_state()
-        except TuneshineConnectionError:
+        except TuneshineApiError:
             return self.async_abort(reason="cannot_connect")
 
         await self.async_set_unique_id(state.hardware_id)
@@ -110,9 +113,10 @@ class TuneshineConfigFlow(ConfigFlow, domain=DOMAIN):
                 try:
                     await client.async_health_check()
                     state = await client.async_get_state()
-                except TuneshineConnectionError:
+                except TuneshineApiError:
                     errors["base"] = "cannot_connect"
                 except Exception:  # noqa: BLE001
+                    _LOGGER.exception("Unexpected error connecting to Tuneshine at %s", host)
                     errors["base"] = "unknown"
                 else:
                     await self.async_set_unique_id(state.hardware_id)
