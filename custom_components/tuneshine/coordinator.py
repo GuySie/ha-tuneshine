@@ -264,7 +264,14 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
                     _LOGGER.debug("Source player has no image, clearing TuneShine")
                     await self.async_clear_local_image()
                 else:
-                    _LOGGER.debug("Sending image to TuneShine: %s", image_url)
+                    _LOGGER.debug(
+                        "Sending image to TuneShine: url=%s track=%r artist=%r album=%r service=%r",
+                        image_url,
+                        state.attributes.get("media_title"),
+                        state.attributes.get("media_artist"),
+                        state.attributes.get("media_album_name"),
+                        state.attributes.get("app_name") or "Home Assistant",
+                    )
                     await self.async_send_local_image(
                         image_url=image_url,
                         track_name=state.attributes.get("media_title"),
