@@ -352,6 +352,8 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             # Tear down source following.
             self.async_cleanup_source_listener()
 
+        self.async_update_listeners()
+
     @property
     def display_mode(self) -> DisplayMode:
         """Return how the display is currently being driven."""
