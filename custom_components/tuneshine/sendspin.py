@@ -124,7 +124,7 @@ class SendspinHandler:
             # If we were in a group when the connection dropped, leave gracefully.
             if self._coordinator.sendspin_active:
                 _LOGGER.debug(
-                    "Sendspin connection lost while in group — reverting to normal operation"
+                    "Sendspin connection ended while in group — reverting to normal operation"
                 )
                 await self._coordinator.async_on_sendspin_group_left()
 

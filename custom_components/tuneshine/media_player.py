@@ -183,6 +183,12 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
         return not self.coordinator.sendspin_active
 
     @property
+    def media_content_id(self) -> str | None:
+        """Return the content ID of the currently displayed media."""
+        meta = self._active_metadata()
+        return meta.item_id if meta else None
+
+    @property
     def media_content_type(self) -> MediaType:
         """Return the content type of the currently displayed media."""
         meta = self._active_metadata()
@@ -216,8 +222,6 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
         if data.remote_metadata:
             if data.remote_metadata.service_name:
                 attrs["streaming_service"] = data.remote_metadata.service_name
-            if data.remote_metadata.item_id:
-                attrs["item_id"] = data.remote_metadata.item_id
             if data.remote_metadata.zone_name:
                 attrs["zone_name"] = data.remote_metadata.zone_name
             if data.remote_metadata.sub_service_name:

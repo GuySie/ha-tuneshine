@@ -173,6 +173,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         album_name: str | None = None,
         service_name: str | None = None,
         animation: str | None = None,
+        item_id: str | None = None,
     ) -> None:
         """POST /image and optimistically update entity state without touching coordinator data.
 
@@ -198,7 +199,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             album_name=album_name,
             service_name=service_name,
             sub_service_name=None,
-            item_id=None,
+            item_id=item_id,
             zone_name=None,
             image_url=image_url,
             content_type=None,
@@ -462,6 +463,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
                         artist_name=state.attributes.get("media_artist"),
                         album_name=state.attributes.get("media_album_name"),
                         service_name=state.attributes.get("app_name") or "Home Assistant",
+                        item_id=state.attributes.get("media_content_id"),
                     )
             else:
                 _LOGGER.debug("Source player in unhandled state %r, no action taken", state.state)
