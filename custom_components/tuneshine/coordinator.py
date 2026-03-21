@@ -234,7 +234,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             self._source_unsub = None
 
         if not entity_id:
-            _LOGGER.debug("No source entity configured; source following disabled")
+            _LOGGER.debug("No source entity configured; source mirroring disabled")
             return
 
         _LOGGER.debug("Setting up source listener for %s", entity_id)
@@ -286,7 +286,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
 
     @property
     def has_source(self) -> bool:
-        """Return True when actively following a source media player."""
+        """Return True when actively mirroring a source media player."""
         return self._source_unsub is not None
 
     @property
@@ -300,10 +300,8 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         stored = self._entry.options.get(CONF_INPUT_MODE)
         if stored is not None:
             return stored
-        # Migration: if a source entity was previously configured, preserve that intent.
-        if self._entry.options.get(CONF_SOURCE_ENTITY_ID):
-            return INPUT_MODE_SOURCE
-        return INPUT_MODE_SENDSPIN
+        # Migration: default to source_mirroring for all installs without an explicit mode stored.
+        return INPUT_MODE_SOURCE
 
     @callback
     def _on_sendspin_connected(self, close_fn: Callable) -> None:
@@ -316,7 +314,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         self._active_sendspin_close = None
 
     async def async_set_input_mode(self, mode: str) -> None:
-        """Switch between source_following, sendspin, and remote_only modes."""
+        """Switch between source_mirroring, sendspin, and remote_only modes."""
         _LOGGER.debug("async_set_input_mode: switching to %r", mode)
         new_options = {**self._entry.options, CONF_INPUT_MODE: mode}
         self.hass.config_entries.async_update_entry(self._entry, options=new_options)
@@ -330,12 +328,12 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             # Unregister mDNS advertisement.
             if self._async_unregister_mdns is not None:
                 await self._async_unregister_mdns()
-            # Start source following with the currently configured source.
+            # Start source mirroring with the currently configured source.
             source = self._entry.options.get(CONF_SOURCE_ENTITY_ID)
             await self.async_setup_source_entity(source)
 
         elif mode == INPUT_MODE_SENDSPIN:
-            # Tear down source following.
+            # Tear down source mirroring.
             self.async_cleanup_source_listener()
             # Advertise via mDNS so Sendspin servers can discover this device.
             if self._async_register_mdns is not None:
@@ -349,7 +347,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             # Unregister Sendspin mDNS advertisement.
             if self._async_unregister_mdns is not None:
                 await self._async_unregister_mdns()
-            # Tear down source following.
+            # Tear down source mirroring.
             self.async_cleanup_source_listener()
 
         self.async_update_listeners()
@@ -361,7 +359,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             return DisplayMode.SENDSPIN
         local = self.optimistic_local_metadata or self.data.local_metadata
         if local and not local.idle:
-            return DisplayMode.FOLLOWING if self.has_source else DisplayMode.LOCAL
+            return DisplayMode.MIRRORING if self.has_source else DisplayMode.LOCAL
         if self.data.remote_metadata and not self.data.remote_metadata.idle:
             return DisplayMode.REMOTE
         return DisplayMode.NONE
@@ -391,11 +389,11 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             self._source_unsub()
             self._source_unsub = None
 
-    async def _async_retrigger_source_following(self) -> None:
-        """Re-apply source following using the current source player state.
+    async def _async_retrigger_source_mirroring(self) -> None:
+        """Re-apply source mirroring using the current source player state.
 
         Called when Sendspin releases the display (stream end, playback stopped)
-        while still in a group, so source following can resume immediately without
+        while still in a group, so source mirroring can resume immediately without
         waiting for the next state-change event from the source player.
         """
         if self.input_mode != INPUT_MODE_SOURCE:
@@ -409,8 +407,8 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
 
     async def _async_handle_source_state(self, state: State | None) -> None:
         """Send or clear image based on the source media player's state."""
-        # Suppress source following only when Sendspin is actively showing content.
-        # While in a group but idle (no optimistic metadata), source following runs normally.
+        # Suppress source mirroring only when Sendspin is actively showing content.
+        # While in a group but idle (no optimistic metadata), source mirroring runs normally.
         if self._sendspin_active and self.optimistic_local_metadata is not None:
             return
         # Re-read the current state before acting: the debounced snapshot may be stale
@@ -546,7 +544,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         self._sendspin_active = True
         self._sendspin_group_id = group_id
         self._sendspin_group_name = group_name
-        # Clear any stale optimistic state from source-following so it doesn't
+        # Clear any stale optimistic state from source-mirroring so it doesn't
         # bleed into Sendspin mode (stale HA proxy URLs are no longer valid).
         self.optimistic_local_metadata = None
         self.async_update_listeners()
@@ -562,7 +560,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             await self.async_clear_local_image()
         except TuneshineApiError as err:
             _LOGGER.warning("Failed to clear image after Sendspin group left: %s", err)
-        # Re-trigger source following if a source media player is configured.
+        # Re-trigger source mirroring if a source media player is configured.
         source_entity_id = self._entry.options.get(CONF_SOURCE_ENTITY_ID)
         if source_entity_id:
             await self.async_setup_source_entity(source_entity_id)
@@ -579,7 +577,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         # Update optimistic metadata immediately so title/artist/album reflect the
         # new track without waiting for artwork. Preserve the image URL only from
         # optimistic state (Sendspin-uploaded artwork) — data.local_metadata may
-        # be stale from source-following and its proxy URLs are no longer valid.
+        # be stale from source-mirroring and its proxy URLs are no longer valid.
         existing = self.optimistic_local_metadata
         self.optimistic_local_metadata = ImageMetadata(
             track_name=metadata.get("title"),
@@ -678,7 +676,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             await self.async_clear_local_image()
         except TuneshineApiError as err:
             _LOGGER.warning("Failed to clear image on Sendspin stream end: %s", err)
-        await self._async_retrigger_source_following()
+        await self._async_retrigger_source_mirroring()
 
     async def async_on_sendspin_playback_stopped(self) -> None:
         """Handle playback paused — blank the device but keep cached artwork for resume."""
@@ -696,7 +694,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             _LOGGER.debug("Sendspin playback stopped — device blanked successfully")
         except TuneshineApiError as err:
             _LOGGER.warning("Failed to blank device on Sendspin playback stop: %s", err)
-        await self._async_retrigger_source_following()
+        await self._async_retrigger_source_mirroring()
 
     async def async_on_sendspin_playback_resumed(self) -> None:
         """Handle playback resumed — re-upload cached artwork if available."""

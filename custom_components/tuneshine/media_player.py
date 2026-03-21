@@ -41,11 +41,11 @@ from .coordinator import TuneshineDataUpdateCoordinator
 from .entity import TuneshineConfigEntry, TuneshineEntity
 
 # Human-readable source labels for the three input modes.
-_SOURCE_FOLLOWING = "Source Following"
+_SOURCE_MIRRORING = "Source Mirroring"
 _SENDSPIN = "Sendspin"
 _REMOTE_ONLY = "Remote Only"
 _INPUT_MODE_TO_LABEL: dict[str, str] = {
-    INPUT_MODE_SOURCE: _SOURCE_FOLLOWING,
+    INPUT_MODE_SOURCE: _SOURCE_MIRRORING,
     INPUT_MODE_SENDSPIN: _SENDSPIN,
     INPUT_MODE_REMOTE: _REMOTE_ONLY,
 }
@@ -119,7 +119,7 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
             # Sendspin is connected but may not be actively streaming.
             # Only report PLAYING when there is active artwork/metadata to show.
             return MediaPlayerState.PLAYING if self._active_metadata() else MediaPlayerState.IDLE
-        if mode in (DisplayMode.FOLLOWING, DisplayMode.REMOTE):
+        if mode in (DisplayMode.MIRRORING, DisplayMode.REMOTE):
             return MediaPlayerState.PLAYING
         return MediaPlayerState.IDLE
 
@@ -134,7 +134,7 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
         # takes priority over any concurrent remote track from the Tuneshine cloud.
         if self.coordinator.sendspin_active:
             # In Sendspin mode, only use optimistic_local_metadata — data.local_metadata
-            # may be stale from a prior source-following session and its image URLs
+            # may be stale from a prior source-mirroring session and its image URLs
             # (e.g. HA media proxy tokens) are no longer valid.
             local = self.coordinator.optimistic_local_metadata
             if local and not local.idle:
@@ -198,7 +198,7 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
     @property
     def source_list(self) -> list[str]:
         """Return the two available input mode labels."""
-        return [_SOURCE_FOLLOWING, _SENDSPIN, _REMOTE_ONLY]
+        return [_SOURCE_MIRRORING, _SENDSPIN, _REMOTE_ONLY]
 
     async def async_select_source(self, source: str) -> None:
         """Switch input mode when the user picks a source label."""

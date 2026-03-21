@@ -57,7 +57,7 @@ class SendspinWebSocketView(HomeAssistantView):
 
         if coordinator.input_mode != INPUT_MODE_SENDSPIN:
             _LOGGER.debug(
-                "Sendspin connection for %r rejected — device is in source_following mode",
+                "Sendspin connection for %r rejected — device is in source_mirroring mode",
                 hardware_id,
             )
             raise web.HTTPConflict

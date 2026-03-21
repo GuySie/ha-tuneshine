@@ -5,7 +5,7 @@ from enum import StrEnum
 class DisplayMode(StrEnum):
     """Possible states for the Tuneshine display mode sensor."""
 
-    FOLLOWING = "following"
+    MIRRORING = "mirroring"
     LOCAL = "local"
     REMOTE = "remote"
     SENDSPIN = "sendspin"
@@ -20,7 +20,7 @@ CONF_DEVICE_NAME = "device_name"
 CONF_SOURCE_ENTITY_ID = "source_entity_id"
 CONF_INPUT_MODE = "input_mode"
 
-INPUT_MODE_SOURCE = "source_following"
+INPUT_MODE_SOURCE = "source_mirroring"
 INPUT_MODE_SENDSPIN = "sendspin"
 INPUT_MODE_REMOTE = "remote_only"
 

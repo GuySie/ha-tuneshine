@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Home Assistant custom integration for the Tuneshine LED album art display. The device exposes a local HTTP API discovered via mDNS (`_tuneshine._tcp.local.`). The integration polls the device every 10 seconds and supports source-following (mirroring a HA media player's artwork).
+A Home Assistant custom integration for the Tuneshine LED album art display. The device exposes a local HTTP API discovered via mDNS (`_tuneshine._tcp.local.`). The integration polls the device every 10 seconds and supports source mirroring (mirroring a HA media player's artwork).
 
 There is no build system, test suite, or linter configured. Development means editing Python files and restarting Home Assistant.
 
@@ -22,18 +22,19 @@ All integration code lives in `custom_components/tuneshine/`.
 1. `coordinator.py` (`TuneshineDataUpdateCoordinator`) polls `/state` every 10 seconds
 2. `api.py` (`TuneshineApiClient`) makes all HTTP calls; `TuneshineState` is the full parsed state
 3. Entities in `media_player.py`, `sensor.py`, `number.py`, `select.py` read from coordinator data
-4. `coordinator.display_mode` derives `DisplayMode` (FOLLOWING/LOCAL/REMOTE/SENDSPIN/NONE) from state
+4. `coordinator.display_mode` derives `DisplayMode` (MIRRORING/LOCAL/REMOTE/SENDSPIN/NONE) from state
 5. `sendspin.py` (`SendspinWebSocketView`, `SendspinHandler`) handles incoming Sendspin server connections
 
-**State model:** The device has no simple playing/stopped flag. State is inferred from `localMetadata` (HA-sent images) vs `remoteMetadata` (cloud/streaming). The media player entity reports `PLAYING` when `display_mode` is FOLLOWING, REMOTE, or SENDSPIN, otherwise `IDLE`.
+**State model:** The device has no simple playing/stopped flag. State is inferred from `localMetadata` (HA-sent images) vs `remoteMetadata` (cloud/streaming). The media player entity reports `PLAYING` when `display_mode` is MIRRORING, REMOTE, or SENDSPIN, otherwise `IDLE`.
 
-**Input mode:** Each device has an "Input Mode" config select entity (`TuneshineInputModeSelectEntity` in `select.py`) with two mutually exclusive options:
-- `source_following` — source following is active; Sendspin mDNS is not advertised and incoming Sendspin connections are rejected (HTTP 409)
-- `sendspin` — mDNS is advertised; Sendspin servers can connect; source following is inactive
+**Input mode:** Controlled via the media player entity's `source_list` / `async_select_source()` — three mutually exclusive modes:
+- `source_mirroring` — source mirroring is active; Sendspin mDNS is not advertised and incoming Sendspin connections are rejected (HTTP 409)
+- `sendspin` — mDNS is advertised; Sendspin servers can connect; source mirroring is inactive
+- `remote_only` — both source mirroring and Sendspin are disabled; device shows cloud/remote content only
 
-The mode is persisted to `entry.options[CONF_INPUT_MODE]`. Switching modes is handled by `coordinator.async_set_input_mode()`, which closes any active Sendspin WebSocket, registers/unregisters mDNS, and enables/disables source following. mDNS callbacks (`_async_register_mdns` / `_async_unregister_mdns`) are wired onto the coordinator by `__init__.py` using `functools.partial`. Migration default: existing installs with a source entity configured default to `source_following`; others default to `sendspin`.
+The mode is persisted to `entry.options[CONF_INPUT_MODE]`. Switching modes is handled by `coordinator.async_set_input_mode()`, which closes any active Sendspin WebSocket, registers/unregisters mDNS, enables/disables source mirroring, and calls `async_update_listeners()` so entities reflect the change immediately. mDNS callbacks (`_async_register_mdns` / `_async_unregister_mdns`) are wired onto the coordinator by `__init__.py` using `functools.partial`. Migration default: any install without an explicit mode stored defaults to `source_mirroring` (with no source entity configured).
 
-**Source following:** When in `source_following` mode and a source entity is configured, the coordinator subscribes to its state changes and sends the artwork URL to the device. Track changes are debounced (0.5s for playing, 2.0s for paused) to absorb brief idle flashes during track transitions. Image URLs are normalized to HTTP — relative paths get HA base URL prepended, HTTPS URLs are proxied through HA's media player proxy.
+**Source mirroring:** When in `source_mirroring` mode and a source entity is configured, the coordinator subscribes to its state changes and sends the artwork URL to the device. Track changes are debounced (0.5s for playing, 2.0s for paused) to absorb brief idle flashes during track transitions. Image URLs are normalized to HTTP — relative paths get HA base URL prepended, HTTPS URLs are proxied through HA's media player proxy.
 
 **Sendspin:** When in `sendspin` mode, the integration advertises itself as a `_sendspin._tcp.local.` mDNS service per device, pointing at a HA WebSocket endpoint at `/api/sendspin/{hardware_id}`. When a Sendspin server (e.g. Music Assistant) connects, it sends artwork (JPEG) and metadata via the protocol. The integration converts incoming JPEG to 64×64 WebP and uploads it to the device via `POST /image` multipart. Artwork bytes are cached for resume. See `sendspin.py` and `.claude/sendspin_reference.md` for full details.
 
@@ -43,6 +44,7 @@ The mode is persisted to `entry.options[CONF_INPUT_MODE]`. Switching modes is ha
 
 ## Key Design Decisions
 
+- Input mode switching uses the media player's `source_list` / `async_select_source()` (HA standard pattern for AV receiver-style input selection) rather than a separate select entity; labels are hardcoded Python strings since HA has no translation mechanism for `source_list` entries
 - `_attr_name = None` on the media player → entity name equals device name with no "Media Player" suffix
 - Brightness entities are `entity_registry_enabled_default=False` (disabled by default)
 - Entity services (`send_image`, `clear_image`) registered via `platform.async_register_entity_service` in `media_player.py`

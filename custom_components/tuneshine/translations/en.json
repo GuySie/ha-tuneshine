@@ -42,7 +42,7 @@
       "display_mode": {
         "name": "Display Mode",
         "state": {
-          "following": "Following",
+          "mirroring": "Mirroring",
           "local": "Local",
           "remote": "Remote",
           "sendspin": "Sendspin",
