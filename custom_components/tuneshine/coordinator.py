@@ -38,7 +38,6 @@ _NON_PLAYING_STATES = frozenset({
     MediaPlayerState.OFF,
     MediaPlayerState.IDLE,
     MediaPlayerState.PAUSED,
-    MediaPlayerState.STANDBY,
 })
 
 
