@@ -56,6 +56,29 @@ def _convert_to_webp(image_bytes: bytes) -> bytes:
         return out.getvalue()
 
 
+def _make_sendspin_metadata(
+    meta: dict,
+    service_name: str | None,
+    item_id: str | None,
+    image_url: str | None,
+) -> ImageMetadata:
+    """Build an ImageMetadata for a Sendspin track."""
+    return ImageMetadata(
+        track_name=meta.get("title"),
+        artist_name=meta.get("artist"),
+        album_name=meta.get("album"),
+        service_name=service_name,
+        sub_service_name=None,
+        item_id=item_id,
+        zone_name=None,
+        image_url=image_url,
+        content_type="track",
+        last_image_error=None,
+        idle=False,
+        account_name=None,
+    )
+
+
 class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
     """Coordinator for a single Tuneshine device."""
 
@@ -88,7 +111,6 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         self._last_remote_item_id: str | None = None
         # Sendspin state — set when a Sendspin server has added this client to a group.
         self._sendspin_active: bool = False
-        self._sendspin_group_id: str | None = None
         self._sendspin_group_name: str | None = None
         self._sendspin_metadata: dict = {}
         # Incremented on each artwork upload; used as a cache-bust query parameter
@@ -370,8 +392,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
 
         The ?v= counter acts as a cache-bust so HA re-fetches on each track change.
         """
-        host_with_port = self.client._base_url[len("http://"):]
-        return f"http://{host_with_port}{API_PATH_ARTWORK}?v={self._sendspin_track_counter}"
+        return f"{self.client.base_url}{API_PATH_ARTWORK}?v={self._sendspin_track_counter}"
 
     @callback
     def async_cleanup_source_listener(self) -> None:
@@ -544,7 +565,6 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             "Sendspin group joined: group_id=%r group_name=%r", group_id, group_name
         )
         self._sendspin_active = True
-        self._sendspin_group_id = group_id
         self._sendspin_group_name = group_name
         # Clear any stale optimistic state from source-mirroring so it doesn't
         # bleed into Sendspin mode (stale HA proxy URLs are no longer valid).
@@ -555,7 +575,6 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         """Handle the client being removed from a Sendspin group."""
         _LOGGER.debug("Sendspin group left — reverting to normal operation")
         self._sendspin_active = False
-        self._sendspin_group_id = None
         self._sendspin_group_name = None
         self._sendspin_metadata = {}
         try:
@@ -563,9 +582,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         except TuneshineApiError as err:
             _LOGGER.warning("Failed to clear image after Sendspin group left: %s", err)
         # Re-trigger source mirroring if a source media player is configured.
-        source_entity_id = self._entry.options.get(CONF_SOURCE_ENTITY_ID)
-        if source_entity_id:
-            await self.async_setup_source_entity(source_entity_id)
+        await self.async_setup_source_entity(self._entry.options.get(CONF_SOURCE_ENTITY_ID))
 
     async def async_on_sendspin_metadata(self, metadata: dict) -> None:
         """Store incoming track metadata from the Sendspin server."""
@@ -581,19 +598,11 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         # optimistic state (Sendspin-uploaded artwork) — data.local_metadata may
         # be stale from source-mirroring and its proxy URLs are no longer valid.
         existing = self.optimistic_local_metadata
-        self.optimistic_local_metadata = ImageMetadata(
-            track_name=metadata.get("title"),
-            artist_name=metadata.get("artist"),
-            album_name=metadata.get("album"),
+        self.optimistic_local_metadata = _make_sendspin_metadata(
+            metadata,
             service_name=self._sendspin_group_name,
-            sub_service_name=None,
             item_id=None,
-            zone_name=None,
             image_url=existing.image_url if existing else None,
-            content_type="track",
-            last_image_error=None,
-            idle=False,
-            account_name=None,
         )
         self.async_update_listeners()
         # Push metadata to the device immediately if a local image already exists
@@ -646,19 +655,11 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         except TuneshineApiError as err:
             _LOGGER.warning("Failed to upload Sendspin artwork: %s", err)
             return
-        self.optimistic_local_metadata = ImageMetadata(
-            track_name=meta.get("title"),
-            artist_name=meta.get("artist"),
-            album_name=meta.get("album"),
+        self.optimistic_local_metadata = _make_sendspin_metadata(
+            meta,
             service_name=self._sendspin_group_name,
-            sub_service_name=None,
             item_id=str(self._sendspin_track_counter),
-            zone_name=None,
             image_url=artwork_url,
-            content_type="track",
-            last_image_error=None,
-            idle=False,
-            account_name=None,
         )
         self.async_update_listeners()
         await self.async_request_refresh()
@@ -730,19 +731,11 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         except TuneshineApiError as err:
             _LOGGER.warning("Failed to restore artwork on Sendspin resume: %s", err)
             return
-        self.optimistic_local_metadata = ImageMetadata(
-            track_name=meta.get("title"),
-            artist_name=meta.get("artist"),
-            album_name=meta.get("album"),
+        self.optimistic_local_metadata = _make_sendspin_metadata(
+            meta,
             service_name=self._sendspin_group_name,
-            sub_service_name=None,
             item_id=str(self._sendspin_track_counter),
-            zone_name=None,
             image_url=artwork_url,
-            content_type="track",
-            last_image_error=None,
-            idle=False,
-            account_name=None,
         )
         self.async_update_listeners()
         await self.async_request_refresh()

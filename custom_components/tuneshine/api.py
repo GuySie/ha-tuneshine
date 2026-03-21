@@ -1,7 +1,6 @@
 """Tuneshine local HTTP API client."""
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -106,6 +105,22 @@ def _parse_state(data: dict) -> TuneshineState:
     )
 
 
+def _metadata_fields(
+    track_name: str | None,
+    artist_name: str | None,
+    album_name: str | None,
+    service_name: str | None,
+) -> dict[str, str]:
+    """Return a dict of non-None metadata fields for the device API."""
+    fields = {
+        "trackName": track_name,
+        "artistName": artist_name,
+        "albumName": album_name,
+        "serviceName": service_name,
+    }
+    return {k: v for k, v in fields.items() if v is not None}
+
+
 class TuneshineApiClient:
     """Async HTTP client for the Tuneshine local API."""
 
@@ -113,11 +128,15 @@ class TuneshineApiClient:
         self,
         host: str,
         session: aiohttp.ClientSession,
-        port: int = DEFAULT_PORT,
     ) -> None:
         """Initialise the client."""
-        self._base_url = f"http://{host}:{port}"
+        self._base_url = f"http://{host}:{DEFAULT_PORT}"
         self._session = session
+
+    @property
+    def base_url(self) -> str:
+        """Return the base URL for the device (http://host:port)."""
+        return self._base_url
 
     async def _request(
         self,
@@ -147,7 +166,7 @@ class TuneshineApiClient:
             raise TuneshineConnectionError(
                 f"Connection error communicating with Tuneshine: {err}"
             ) from err
-        except asyncio.TimeoutError as err:
+        except TimeoutError as err:
             raise TuneshineConnectionError(
                 f"Timeout communicating with Tuneshine at {self._base_url}"
             ) from err
@@ -175,15 +194,7 @@ class TuneshineApiClient:
             "POST /image (url): %s track=%r artist=%r album=%r service=%r animation=%r",
             image_url, track_name, artist_name, album_name, service_name, animation,
         )
-        body: dict[str, object] = {"imageUrl": image_url}
-        if track_name is not None:
-            body["trackName"] = track_name
-        if artist_name is not None:
-            body["artistName"] = artist_name
-        if album_name is not None:
-            body["albumName"] = album_name
-        if service_name is not None:
-            body["serviceName"] = service_name
+        body: dict[str, object] = {"imageUrl": image_url, **_metadata_fields(track_name, artist_name, album_name, service_name)}
         if animation is not None:
             body["animation"] = animation
         await self._request("POST", API_PATH_IMAGE, json=body)
@@ -203,15 +214,7 @@ class TuneshineApiClient:
             "POST /image (metadata only): track=%r artist=%r album=%r service=%r",
             track_name, artist_name, album_name, service_name,
         )
-        body: dict[str, object] = {}
-        if track_name is not None:
-            body["trackName"] = track_name
-        if artist_name is not None:
-            body["artistName"] = artist_name
-        if album_name is not None:
-            body["albumName"] = album_name
-        if service_name is not None:
-            body["serviceName"] = service_name
+        body = _metadata_fields(track_name, artist_name, album_name, service_name)
         await self._request("POST", API_PATH_IMAGE, json=body)
 
     async def async_clear_image(self) -> None:
@@ -229,17 +232,9 @@ class TuneshineApiClient:
         service_name: str | None = None,
     ) -> None:
         """POST /image with multipart/form-data — upload binary image directly."""
-        metadata: dict[str, object] = {}
+        metadata = _metadata_fields(track_name, artist_name, album_name, service_name)
         if image_url is not None:
             metadata["imageUrl"] = image_url
-        if track_name is not None:
-            metadata["trackName"] = track_name
-        if artist_name is not None:
-            metadata["artistName"] = artist_name
-        if album_name is not None:
-            metadata["albumName"] = album_name
-        if service_name is not None:
-            metadata["serviceName"] = service_name
         form = aiohttp.FormData()
         form.add_field("image", image_bytes, content_type="image/webp")
         if metadata:

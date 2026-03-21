@@ -203,7 +203,7 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
 
     @property
     def source_list(self) -> list[str]:
-        """Return the two available input mode labels."""
+        """Return the available input mode labels."""
         return [_SOURCE_MIRRORING, _SENDSPIN, _REMOTE_ONLY]
 
     async def async_select_source(self, source: str) -> None:
