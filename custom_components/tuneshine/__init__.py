@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import TuneshineApiClient
-from .const import CONF_SOURCE_ENTITY_ID, DOMAIN, INPUT_MODE_SENDSPIN, INPUT_MODE_SOURCE
+from .const import CONF_SOURCE_ENTITY_ID, DOMAIN, INPUT_MODE_REMOTE, INPUT_MODE_SENDSPIN, INPUT_MODE_SOURCE
 from .coordinator import TuneshineDataUpdateCoordinator
 from .entity import TuneshineConfigEntry
 from .sendspin import SendspinWebSocketView
@@ -60,6 +60,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: TuneshineConfigEntry) ->
         await _async_register_sendspin_mdns(hass, entry, coordinator)
     elif coordinator.input_mode == INPUT_MODE_SOURCE:
         await coordinator.async_setup_source_entity(entry.options.get(CONF_SOURCE_ENTITY_ID))
+    # INPUT_MODE_REMOTE: nothing to activate — device shows cloud content passively.
 
     return True
 

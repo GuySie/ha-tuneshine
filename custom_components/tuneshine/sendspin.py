@@ -218,16 +218,18 @@ class SendspinHandler:
                 group_name,
                 playback_state,
             )
-            if group_id is None:
+            # Delta semantics: "group_id" key absent means unchanged; key present
+            # with null value means removed from group.
+            if "group_id" in payload and payload["group_id"] is None:
                 await self._coordinator.async_on_sendspin_group_left()
-            elif playback_state == "stopped":
-                await self._coordinator.async_on_sendspin_group_joined(group_id, group_name)
-                await self._coordinator.async_on_sendspin_playback_stopped()
-            elif playback_state == "playing":
-                await self._coordinator.async_on_sendspin_group_joined(group_id, group_name)
-                await self._coordinator.async_on_sendspin_playback_resumed()
             else:
-                await self._coordinator.async_on_sendspin_group_joined(group_id, group_name)
+                # group_id present with a value → join/update; absent → unchanged.
+                if group_id is not None:
+                    await self._coordinator.async_on_sendspin_group_joined(group_id, group_name)
+                if playback_state == "stopped":
+                    await self._coordinator.async_on_sendspin_playback_stopped()
+                elif playback_state == "playing":
+                    await self._coordinator.async_on_sendspin_playback_resumed()
 
         elif msg_type == "server/state":
             metadata = payload.get("metadata") or {}

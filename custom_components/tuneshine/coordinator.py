@@ -23,6 +23,7 @@ from .const import (
     CONF_INPUT_MODE,
     CONF_SOURCE_ENTITY_ID,
     DOMAIN,
+    INPUT_MODE_REMOTE,
     INPUT_MODE_SENDSPIN,
     INPUT_MODE_SOURCE,
     POLL_INTERVAL_SECONDS,
@@ -219,8 +220,8 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
     async def async_setup_source_entity(self, entity_id: str | None) -> None:
         """Set up or replace the source media player subscription in-place."""
         _LOGGER.debug("async_setup_source_entity called with entity_id=%r", entity_id)
-        if self.input_mode == INPUT_MODE_SENDSPIN:
-            _LOGGER.debug("async_setup_source_entity skipped — input mode is sendspin")
+        if self.input_mode != INPUT_MODE_SOURCE:
+            _LOGGER.debug("async_setup_source_entity skipped — input mode is %r", self.input_mode)
             return
         # Tear down any existing subscription first.
         if self._debounce_unsub is not None:
@@ -315,7 +316,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         self._active_sendspin_ws = None
 
     async def async_set_input_mode(self, mode: str) -> None:
-        """Switch between source_following and sendspin modes."""
+        """Switch between source_following, sendspin, and remote_only modes."""
         _LOGGER.debug("async_set_input_mode: switching to %r", mode)
         new_options = {**self._entry.options, CONF_INPUT_MODE: mode}
         self.hass.config_entries.async_update_entry(self._entry, options=new_options)
@@ -339,6 +340,17 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             # Advertise via mDNS so Sendspin servers can discover this device.
             if self._async_register_mdns is not None:
                 await self._async_register_mdns()
+
+        elif mode == INPUT_MODE_REMOTE:
+            # Close any active Sendspin connection.
+            if self._active_sendspin_ws is not None:
+                _LOGGER.debug("async_set_input_mode: closing active Sendspin WebSocket")
+                await self._active_sendspin_ws.close()
+            # Unregister Sendspin mDNS advertisement.
+            if self._async_unregister_mdns is not None:
+                await self._async_unregister_mdns()
+            # Tear down source following.
+            self.async_cleanup_source_listener()
 
     @property
     def display_mode(self) -> DisplayMode:
@@ -384,6 +396,8 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         while still in a group, so source following can resume immediately without
         waiting for the next state-change event from the source player.
         """
+        if self.input_mode != INPUT_MODE_SOURCE:
+            return
         source_entity_id = self._entry.options.get(CONF_SOURCE_ENTITY_ID)
         if not source_entity_id:
             return

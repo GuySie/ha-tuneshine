@@ -22,6 +22,7 @@ CONF_INPUT_MODE = "input_mode"
 
 INPUT_MODE_SOURCE = "source_following"
 INPUT_MODE_SENDSPIN = "sendspin"
+INPUT_MODE_REMOTE = "remote_only"
 
 # API paths (confirmed from OpenAPI spec)
 API_PATH_HEALTH = "/health"

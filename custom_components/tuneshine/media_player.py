@@ -31,11 +31,25 @@ from .const import (
     ATTR_SERVICE_NAME,
     ATTR_TRACK_NAME,
     DisplayMode,
+    INPUT_MODE_REMOTE,
+    INPUT_MODE_SENDSPIN,
+    INPUT_MODE_SOURCE,
     SERVICE_CLEAR_IMAGE,
     SERVICE_SEND_IMAGE,
 )
 from .coordinator import TuneshineDataUpdateCoordinator
 from .entity import TuneshineConfigEntry, TuneshineEntity
+
+# Human-readable source labels for the three input modes.
+_SOURCE_FOLLOWING = "Source Following"
+_SENDSPIN = "Sendspin"
+_REMOTE_ONLY = "Remote Only"
+_INPUT_MODE_TO_LABEL: dict[str, str] = {
+    INPUT_MODE_SOURCE: _SOURCE_FOLLOWING,
+    INPUT_MODE_SENDSPIN: _SENDSPIN,
+    INPUT_MODE_REMOTE: _REMOTE_ONLY,
+}
+_LABEL_TO_INPUT_MODE: dict[str, str] = {v: k for k, v in _INPUT_MODE_TO_LABEL.items()}
 
 # Map Tuneshine contentType strings to HA MediaType enum values.
 _CONTENT_TYPE_MAP: dict[str, MediaType] = {
@@ -83,7 +97,10 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
 
     # No suffix — entity name is just the device name ("Tuneshine").
     _attr_name = None
-    _attr_supported_features = MediaPlayerEntityFeature.PLAY_MEDIA
+    _attr_supported_features = (
+        MediaPlayerEntityFeature.PLAY_MEDIA
+        | MediaPlayerEntityFeature.SELECT_SOURCE
+    )
 
     def __init__(self, coordinator: TuneshineDataUpdateCoordinator) -> None:
         """Initialise the media player."""
@@ -175,17 +192,21 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
 
     @property
     def source(self) -> str | None:
-        """Return the connected streaming service name."""
-        data = self.coordinator.data
-        if data.remote_metadata:
-            return data.remote_metadata.service_name
-        return None
+        """Return the current input mode as a human-readable label."""
+        return _INPUT_MODE_TO_LABEL.get(self.coordinator.input_mode)
 
     @property
-    def source_list(self) -> list[str] | None:
-        """Return the current streaming service as the only source."""
-        source = self.source
-        return [source] if source else None
+    def source_list(self) -> list[str]:
+        """Return the two available input mode labels."""
+        return [_SOURCE_FOLLOWING, _SENDSPIN, _REMOTE_ONLY]
+
+    async def async_select_source(self, source: str) -> None:
+        """Switch input mode when the user picks a source label."""
+        mode = _LABEL_TO_INPUT_MODE.get(source)
+        if mode is None:
+            _LOGGER.warning("async_select_source: unknown source %r, ignoring", source)
+            return
+        await self.coordinator.async_set_input_mode(mode)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -193,6 +214,8 @@ class TuneshineMediaPlayer(TuneshineEntity, MediaPlayerEntity):
         data = self.coordinator.data
         attrs: dict[str, Any] = {}
         if data.remote_metadata:
+            if data.remote_metadata.service_name:
+                attrs["streaming_service"] = data.remote_metadata.service_name
             if data.remote_metadata.item_id:
                 attrs["item_id"] = data.remote_metadata.item_id
             if data.remote_metadata.zone_name:
