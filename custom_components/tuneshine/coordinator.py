@@ -97,8 +97,9 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         # Last uploaded artwork bytes (WebP), retained across pause so we can
         # re-upload on resume without waiting for the server to resend.
         self._sendspin_cached_artwork: bytes | None = None
-        # Active Sendspin WebSocket — stored so async_set_input_mode can close it.
-        self._active_sendspin_ws: object | None = None
+        # Coroutine that sends client/goodbye then closes the active Sendspin WebSocket.
+        # Stored so async_set_input_mode can initiate a graceful shutdown.
+        self._active_sendspin_close: Callable | None = None
         # mDNS register/unregister callbacks wired in by __init__.py.
         self._async_register_mdns: Callable | None = None
         self._async_unregister_mdns: Callable | None = None
@@ -305,14 +306,14 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         return INPUT_MODE_SENDSPIN
 
     @callback
-    def _on_sendspin_connected(self, ws: object) -> None:
-        """Store the active Sendspin WebSocket so we can close it on mode switch."""
-        self._active_sendspin_ws = ws
+    def _on_sendspin_connected(self, close_fn: Callable) -> None:
+        """Store a close coroutine for the active Sendspin connection."""
+        self._active_sendspin_close = close_fn
 
     @callback
     def _on_sendspin_disconnected(self) -> None:
-        """Clear the active Sendspin WebSocket reference when the connection closes."""
-        self._active_sendspin_ws = None
+        """Clear the active Sendspin close coroutine when the connection closes."""
+        self._active_sendspin_close = None
 
     async def async_set_input_mode(self, mode: str) -> None:
         """Switch between source_following, sendspin, and remote_only modes."""
@@ -322,9 +323,9 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
 
         if mode == INPUT_MODE_SOURCE:
             # Close any active Sendspin connection first.
-            if self._active_sendspin_ws is not None:
+            if self._active_sendspin_close is not None:
                 _LOGGER.debug("async_set_input_mode: closing active Sendspin WebSocket")
-                await self._active_sendspin_ws.close()
+                await self._active_sendspin_close()
                 # Handler's finally block calls _on_sendspin_disconnected + async_on_sendspin_group_left
             # Unregister mDNS advertisement.
             if self._async_unregister_mdns is not None:
@@ -342,9 +343,9 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
 
         elif mode == INPUT_MODE_REMOTE:
             # Close any active Sendspin connection.
-            if self._active_sendspin_ws is not None:
+            if self._active_sendspin_close is not None:
                 _LOGGER.debug("async_set_input_mode: closing active Sendspin WebSocket")
-                await self._active_sendspin_ws.close()
+                await self._active_sendspin_close()
             # Unregister Sendspin mDNS advertisement.
             if self._async_unregister_mdns is not None:
                 await self._async_unregister_mdns()

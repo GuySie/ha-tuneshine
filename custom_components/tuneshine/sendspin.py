@@ -93,8 +93,8 @@ class SendspinHandler:
         device_name = self._coordinator.data.name or "Tuneshine"
         _LOGGER.debug("Sendspin connection opened for device %r (%s)", device_name, hardware_id)
 
-        # Register with coordinator so it can close this connection on mode switch.
-        self._coordinator._on_sendspin_connected(self._ws)
+        # Register with coordinator so it can initiate a graceful shutdown on mode switch.
+        self._coordinator._on_sendspin_connected(self._async_goodbye_and_close)
 
         await self._send_client_hello(hardware_id, device_name)
 
@@ -107,6 +107,7 @@ class SendspinHandler:
                 elif msg.type == web.WSMsgType.BINARY:
                     await self._handle_binary(msg.data)
                 elif msg.type in (web.WSMsgType.CLOSE, web.WSMsgType.CLOSING, web.WSMsgType.CLOSED):
+                    _LOGGER.debug("Sendspin received WebSocket close frame for %s", hardware_id)
                     break
                 elif msg.type == web.WSMsgType.ERROR:
                     _LOGGER.warning(
@@ -120,7 +121,6 @@ class SendspinHandler:
             time_task.cancel()
             self._coordinator._on_sendspin_disconnected()
             _LOGGER.debug("Sendspin connection closed for device %s", hardware_id)
-            await self._send_client_goodbye()
             # If we were in a group when the connection dropped, leave gracefully.
             if self._coordinator.sendspin_active:
                 _LOGGER.debug(
@@ -176,6 +176,13 @@ class SendspinHandler:
             _LOGGER.debug("Sendspin client/time loop cancelled for %s", hardware_id)
         except Exception:
             _LOGGER.debug("Sendspin client/time loop ended unexpectedly for %s", hardware_id, exc_info=True)
+
+    async def _async_goodbye_and_close(self) -> None:
+        """Send client/goodbye then close the WebSocket (called by coordinator on mode switch)."""
+        _LOGGER.debug("Sendspin initiating graceful shutdown for %s", self._coordinator.data.hardware_id)
+        await self._send_client_goodbye()
+        _LOGGER.debug("Sendspin closing WebSocket for %s", self._coordinator.data.hardware_id)
+        await self._ws.close()
 
     async def _send_client_goodbye(self) -> None:
         """Send client/goodbye before closing."""
@@ -234,16 +241,20 @@ class SendspinHandler:
         elif msg_type == "server/state":
             metadata = payload.get("metadata") or {}
             playback_state = payload.get("playback_state")
+            metadata_status = (
+                "present" if metadata
+                else "null (clear)" if "metadata" in payload
+                else "absent (unchanged)"
+            )
             _LOGGER.debug(
-                "Sendspin server/state: has_metadata=%s playback_state=%r",
-                bool(metadata),
+                "Sendspin server/state: metadata=%s playback_state=%r",
+                metadata_status,
                 playback_state,
             )
             if metadata:
                 await self._coordinator.async_on_sendspin_metadata(metadata)
             elif "metadata" in payload and payload["metadata"] is None:
                 # Explicit null — delta semantics say clear the field.
-                _LOGGER.debug("Sendspin server/state: metadata explicitly null — clearing artwork")
                 await self._coordinator.async_on_sendspin_stream_end()
 
         elif msg_type == "stream/end":
