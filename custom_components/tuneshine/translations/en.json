@@ -24,19 +24,6 @@
       "cannot_connect": "Unable to reach the device during discovery."
     }
   },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Tuneshine options",
-        "data": {
-          "source_entity_id": "Source media player"
-        },
-        "data_description": {
-          "source_entity_id": "Mirror cover art and metadata from this media player onto Tuneshine. Leave empty to use only Tuneshine's own music source."
-        }
-      }
-    }
-  },
   "entity": {
     "sensor": {
       "display_mode": {
