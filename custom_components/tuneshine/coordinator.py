@@ -125,6 +125,14 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         # mDNS register/unregister callbacks wired in by __init__.py.
         self._async_register_mdns: Callable | None = None
         self._async_unregister_mdns: Callable | None = None
+        # Source-mirroring artwork staleness tracking.
+        # Some integrations (e.g. Apple TV) fire a state_changed event for a new
+        # track before fetching the new artwork, so entity_picture keeps the old
+        # cache hash.  We track the last URL we sent so we can detect this and
+        # retry after a short delay instead of uploading stale artwork.
+        self._last_sent_url: str | None = None
+        self._last_sent_track_key: tuple[str | None, str | None] | None = None
+        self._artwork_retry_unsub: Callable[[], None] | None = None
 
     async def _async_update_data(self) -> TuneshineState:
         """Fetch state from device."""
@@ -278,11 +286,15 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
                 entity_id,
                 new_state.state if new_state else "removed",
             )
-            # Cancel any pending debounced call before scheduling a new one.
+            # Cancel any pending debounced call or artwork retry before scheduling a new one.
             if self._debounce_unsub is not None:
                 _LOGGER.debug("Cancelling previous debounce before rescheduling")
                 self._debounce_unsub()
                 self._debounce_unsub = None
+            if self._artwork_retry_unsub is not None:
+                _LOGGER.debug("Cancelling pending artwork retry before rescheduling")
+                self._artwork_retry_unsub()
+                self._artwork_retry_unsub = None
 
             # Use a longer debounce for non-playing states to absorb the brief
             # idle flash that some players emit during track changes.
@@ -406,10 +418,16 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
             _LOGGER.debug("Cancelling pending debounce timer during cleanup")
             self._debounce_unsub()
             self._debounce_unsub = None
+        if self._artwork_retry_unsub is not None:
+            _LOGGER.debug("Cancelling pending artwork retry during cleanup")
+            self._artwork_retry_unsub()
+            self._artwork_retry_unsub = None
         if self._source_unsub is not None:
             _LOGGER.debug("Unsubscribing from source state listener during cleanup")
             self._source_unsub()
             self._source_unsub = None
+        self._last_sent_url = None
+        self._last_sent_track_key = None
 
     async def _async_retrigger_source_mirroring(self) -> None:
         """Re-apply source mirroring using the current source player state.
@@ -456,6 +474,8 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
                     "Source player not playing (%s), clearing image",
                     state.state if state else "none",
                 )
+                self._last_sent_url = None
+                self._last_sent_track_key = None
                 await self.async_clear_local_image()
             elif state.state == "playing":
                 image_url = self._get_image_url(state)
@@ -468,29 +488,93 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
                 )
                 if image_url is None:
                     _LOGGER.debug("Source player has no image, clearing Tuneshine")
+                    self._last_sent_url = None
+                    self._last_sent_track_key = None
                     await self.async_clear_local_image()
                 else:
-                    _LOGGER.debug(
-                        "Sending image to Tuneshine: url=%s track=%r artist=%r album=%r service=%r",
-                        image_url,
+                    track_key = (
                         state.attributes.get("media_title"),
                         state.attributes.get("media_artist"),
-                        state.attributes.get("media_album_name"),
-                        state.attributes.get("app_name") or "Home Assistant",
                     )
-                    await self.async_send_local_image(
-                        image_url=image_url,
-                        track_name=state.attributes.get("media_title"),
-                        artist_name=state.attributes.get("media_artist"),
-                        album_name=state.attributes.get("media_album_name"),
-                        service_name=state.attributes.get("app_name") or "Home Assistant",
-                        item_id=state.attributes.get("media_content_id"),
-                    )
+                    if (
+                        image_url == self._last_sent_url
+                        and track_key != self._last_sent_track_key
+                    ):
+                        # The track changed but entity_picture cache hash hasn't
+                        # updated yet — the source integration (e.g. Apple TV) fired
+                        # the state_changed event before fetching the new artwork.
+                        # Schedule a retry so we pick up the new URL once it's ready
+                        # rather than uploading the previous track's artwork.
+                        _LOGGER.debug(
+                            "Track changed to %r but image URL unchanged — "
+                            "scheduling artwork retry in 3 s",
+                            track_key,
+                        )
+                        self._schedule_artwork_retry(state.entity_id)
+                    else:
+                        _LOGGER.debug(
+                            "Sending image to Tuneshine: url=%s track=%r artist=%r album=%r service=%r",
+                            image_url,
+                            state.attributes.get("media_title"),
+                            state.attributes.get("media_artist"),
+                            state.attributes.get("media_album_name"),
+                            state.attributes.get("app_name") or "Home Assistant",
+                        )
+                        self._last_sent_url = image_url
+                        self._last_sent_track_key = track_key
+                        await self.async_send_local_image(
+                            image_url=image_url,
+                            track_name=state.attributes.get("media_title"),
+                            artist_name=state.attributes.get("media_artist"),
+                            album_name=state.attributes.get("media_album_name"),
+                            service_name=state.attributes.get("app_name") or "Home Assistant",
+                            item_id=state.attributes.get("media_content_id"),
+                        )
             else:
                 _LOGGER.debug("Source player in unhandled state %r, no action taken", state.state)
         except TuneshineApiError as err:
             _LOGGER.warning("Failed to update Tuneshine from source player: %s", err)
             return
+
+    @callback
+    def _schedule_artwork_retry(self, entity_id: str) -> None:
+        """Schedule a single re-read of the source player state after a short delay.
+
+        Called when a track change is detected but the entity_picture URL hasn't
+        updated yet (same cache hash as the previous track).  Clears _last_sent_url
+        so the retry is not blocked by the stale-URL guard.
+        """
+        if self._artwork_retry_unsub is not None:
+            _LOGGER.debug("Cancelling previous artwork retry before rescheduling")
+            self._artwork_retry_unsub()
+            self._artwork_retry_unsub = None
+
+        @callback
+        def _retry(_now: object) -> None:  # noqa: ARG001
+            self._artwork_retry_unsub = None
+            # Clear so the stale-URL check doesn't suppress this retry.
+            self._last_sent_url = None
+            state = self.hass.states.get(entity_id)
+            _LOGGER.debug(
+                "Artwork retry fired for %s — state=%s",
+                entity_id,
+                state.state if state else "not found",
+            )
+            if state is None or state.state in _NON_PLAYING_STATES:
+                _LOGGER.debug(
+                    "Artwork retry skipped — %s is not playing (%s)",
+                    entity_id,
+                    state.state if state else "not found",
+                )
+                return
+            if self._handler_task is not None and not self._handler_task.done():
+                _LOGGER.debug("Cancelling in-flight handler task before artwork retry")
+                self._handler_task.cancel()
+            self._handler_task = self.hass.async_create_task(
+                self._async_handle_source_state(state)
+            )
+
+        self._artwork_retry_unsub = async_call_later(self.hass, 3.0, _retry)
 
     def _get_image_url(self, state: State) -> str | None:
         """Return an http:// image URL for the media player's current artwork.
