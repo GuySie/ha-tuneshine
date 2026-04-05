@@ -25,7 +25,7 @@ All integration code lives in `custom_components/tuneshine/`.
 4. `coordinator.display_mode` derives `DisplayMode` (MIRRORING/LOCAL/REMOTE/SENDSPIN/NONE) from state
 5. `sendspin.py` (`SendspinWebSocketView`, `SendspinHandler`) handles incoming Sendspin server connections
 
-**State model:** The device has no simple playing/stopped flag. State is inferred from `localMetadata` (HA-sent images) vs `remoteMetadata` (cloud/streaming). The media player entity reports `PLAYING` when `display_mode` is MIRRORING, REMOTE, or SENDSPIN, otherwise `IDLE`. `media_content_id` is exposed as a standard HA property (populated from the active track's `item_id`). `extra_state_attributes` includes `streaming_service` (from `remoteMetadata.serviceName`) when a remote track is active.
+**State model:** The device has no simple playing/stopped flag. The `imageSource` field in `/state` (`"system"` / `"local"` / `"remote"`) is the authoritative signal for what is currently displayed — `"local"` means an image was uploaded via the local HTTP API, `"remote"` means it came from the Tuneshine cloud WebSocket, `"system"` means the startup splash (nothing received yet). `display_mode` is derived from `imageSource` combined with the `idle` flag on the active metadata object, plus the integration's own `_sendspin_active` and `optimistic_local_metadata` tracking. The media player entity reports `PLAYING` when `display_mode` is MIRRORING, REMOTE, or SENDSPIN, otherwise `IDLE`. `media_content_id` is exposed as a standard HA property (populated from the active track's `item_id`). `extra_state_attributes` includes `streaming_service` (from `remoteMetadata.serviceName`) when a remote track is active.
 
 **Input mode:** Controlled via the media player entity's `source_list` / `async_select_source()` — three mutually exclusive modes:
 - `source_mirroring` — source mirroring is active; Sendspin mDNS is not advertised and incoming Sendspin connections are rejected (HTTP 409)
@@ -54,13 +54,13 @@ The mode is persisted to `entry.options[CONF_INPUT_MODE]`. Switching modes is ha
 - Sendspin mDNS service name includes hardware_id for per-device uniqueness: `{device_name} ({hardware_id})._sendspin._tcp.local.`
 - mDNS registration is idempotent (`_sendspin_mdns_info` checked before registering); `_async_unregister_sendspin_mdns` is the single unregister path used both at runtime and on entry unload
 - `media_image_remotely_accessible = False` when Sendspin is active — device artwork URL is local HTTP, which HA must proxy to avoid mixed-content blocks in the HTTPS frontend
-- Sendspin artwork is uploaded without `imageUrl` in the multipart metadata so the device stores the binary at `GET /artwork` (see api_reference.md Known Spec Inaccuracies)
+- Sendspin artwork is uploaded without `imageUrl` in the multipart metadata so the device stores the binary at `GET /artwork` — including `imageUrl` alongside the binary suppresses storage (device serves 404 from `/artwork` even though the image displays correctly)
 - Declare `media_width/height: 512` in `client/hello` so the Sendspin server sends a higher-resolution image; integration then resizes to 64×64 before uploading to device
 - `stream/clear` is treated identically to `stream/end` (discards cached artwork and clears device)
 
 ## API Reference
 
-See `.claude/api_reference.md` (not committed) for the Tuneshine local HTTP API spec, known spec inaccuracies vs actual device behavior, and sample responses. Built against firmware 2.3.2.
+See `.claude/api_reference.md` (not committed) for the Tuneshine local HTTP API spec, known spec inaccuracies vs actual device behavior, and sample responses. Built against firmware 2.3.3 (OpenAPI 1.0.1).
 
 Key endpoints: `GET /health`, `GET /state`, `POST /image`, `DELETE /image`, `POST /brightness`.
 

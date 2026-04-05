@@ -83,7 +83,7 @@ Remove the locally-provided image, returning the display to its idle state.
 
 ## API
 
-This integration was built against Tuneshine firmware 2.3.2 and Tuneshine device API 1.0.0.
+This integration was built against Tuneshine firmware 2.3.3 and Tuneshine device API 1.0.1.
 
 ## Vibecoding
 
