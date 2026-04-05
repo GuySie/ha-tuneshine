@@ -62,6 +62,7 @@ class TuneshineState:
     firmware_version: str
     brightness: BrightnessConfig
     animation: str
+    image_source: str  # "system" | "local" | "remote"
     local_metadata: ImageMetadata | None
     remote_metadata: ImageMetadata | None
 
@@ -100,6 +101,7 @@ def _parse_state(data: dict) -> TuneshineState:
             idle=brightness_data.get("idle", 50),
         ),
         animation=config.get("animation", "none"),
+        image_source=data.get("imageSource", "local"),
         local_metadata=_parse_image_metadata(data.get("localMetadata")),
         remote_metadata=_parse_image_metadata(data.get("remoteMetadata")),
     )

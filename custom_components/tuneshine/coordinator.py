@@ -392,11 +392,18 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         """Return how the display is currently being driven."""
         if self._sendspin_active:
             return DisplayMode.SENDSPIN
-        local = self.optimistic_local_metadata or self.data.local_metadata
-        if local and not local.idle:
+        # Optimistic path: we've sent a local image but the poll hasn't confirmed yet.
+        if self.optimistic_local_metadata and not self.optimistic_local_metadata.idle:
             return DisplayMode.MIRRORING if self.has_source else DisplayMode.LOCAL
-        if self.data.remote_metadata and not self.data.remote_metadata.idle:
-            return DisplayMode.REMOTE
+        # Use imageSource as the authoritative signal from the device.
+        if self.data.image_source == "local":
+            local = self.data.local_metadata
+            if local and not local.idle:
+                return DisplayMode.MIRRORING if self.has_source else DisplayMode.LOCAL
+        elif self.data.image_source == "remote":
+            remote = self.data.remote_metadata
+            if remote and not remote.idle:
+                return DisplayMode.REMOTE
         return DisplayMode.NONE
 
     def _artwork_url(self) -> str:
