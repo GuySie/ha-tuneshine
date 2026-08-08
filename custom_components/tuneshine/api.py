@@ -13,6 +13,7 @@ from .const import (
     API_PATH_BRIGHTNESS,
     API_PATH_HEALTH,
     API_PATH_IMAGE,
+    API_PATH_PRESERVE_ARTWORK,
     API_PATH_STATE,
     DEFAULT_PORT,
 )
@@ -54,14 +55,25 @@ class BrightnessConfig:
 
 
 @dataclass
+class WifiState:
+    """Device wifi connection state."""
+
+    ssid: str | None
+    status: str
+
+
+@dataclass
 class TuneshineState:
     """Full device state from GET /state."""
 
     hardware_id: str
     name: str | None
     firmware_version: str
+    mode: str  # "cloud" | "roon" | "wiim" | "api"
+    wifi: WifiState
     brightness: BrightnessConfig
     animation: str
+    preserve_artwork: bool
     image_source: str  # "system" | "local" | "remote"
     local_metadata: ImageMetadata | None
     remote_metadata: ImageMetadata | None
@@ -91,16 +103,23 @@ def _parse_state(data: dict) -> TuneshineState:
     """Parse a TuneshineState from a raw /state response dict."""
     config = data.get("config", {})
     brightness_data = config.get("brightness", {})
+    wifi_data = data.get("wifi", {})
     return TuneshineState(
         hardware_id=data["hardwareId"],
         name=data.get("name"),
         firmware_version=data.get("firmwareVersion", ""),
+        mode=data.get("mode", "cloud"),
+        wifi=WifiState(
+            ssid=wifi_data.get("ssid"),
+            status=wifi_data.get("status", "connected"),
+        ),
         brightness=BrightnessConfig(
             base=brightness_data.get("base", 50),
             active=brightness_data.get("active", 50),
             idle=brightness_data.get("idle", 50),
         ),
         animation=config.get("animation", "none"),
+        preserve_artwork=config.get("preserveArtwork", False),
         image_source=data.get("imageSource", "local"),
         local_metadata=_parse_image_metadata(data.get("localMetadata")),
         remote_metadata=_parse_image_metadata(data.get("remoteMetadata")),
@@ -219,10 +238,16 @@ class TuneshineApiClient:
         body = _metadata_fields(track_name, artist_name, album_name, service_name)
         await self._request("POST", API_PATH_IMAGE, json=body)
 
-    async def async_clear_image(self) -> None:
-        """DELETE /image — remove locally-provided image."""
-        _LOGGER.debug("DELETE /image")
-        await self._request("DELETE", API_PATH_IMAGE)
+    async def async_clear_image(self, preserve_image: bool | None = None) -> None:
+        """DELETE /image — remove locally-provided image.
+
+        preserve_image=False forces a full revert to the idle image even if
+        the device's preserve-artwork setting would otherwise keep the last
+        image on screen, dimmed.
+        """
+        _LOGGER.debug("DELETE /image preserve_image=%r", preserve_image)
+        body = {"preserveImage": False} if preserve_image is False else None
+        await self._request("DELETE", API_PATH_IMAGE, json=body)
 
     async def async_send_image_binary(
         self,
@@ -261,3 +286,10 @@ class TuneshineApiClient:
         if idle is not None:
             body["idle"] = idle
         await self._request("POST", API_PATH_BRIGHTNESS, json=body)
+
+    async def async_set_preserve_artwork(self, enabled: bool) -> None:
+        """POST /preserve-artwork — toggle keeping the last artwork (dimmed) when playback stops."""
+        _LOGGER.debug("POST /preserve-artwork: enabled=%r", enabled)
+        await self._request(
+            "POST", API_PATH_PRESERVE_ARTWORK, json={"preserveArtwork": enabled}
+        )

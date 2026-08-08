@@ -9,6 +9,7 @@ Home Assistant integration for the [Tuneshine](https://tuneshine.rocks) LED albu
 - **Input mode** — switch between Source Mirroring, Sendspin, and Remote Only via the media player source selector; the modes are mutually exclusive
 - **Display mode sensor** — reports what is currently driving the display (`remote`, `local`, `mirroring`, `sendspin`, or `none`)
 - **Brightness controls** — set active and idle brightness (1–100, disabled by default)
+- **Preserve Artwork switch** — keep the last track's artwork (dimmed) on screen instead of the idle image when playback stops (firmware 2.6.1+)
 - **Entity services** — `send_image` and `clear_image` for automation use
 
 ## Manual Install
@@ -23,6 +24,12 @@ The integration will expose a media player that will mirror what is currently be
 ## Source Mirroring
 
 Select **Source Mirroring** from the media player source selector, then set **Source Media Player** to any media player in your system. Tuneshine will display the current track artwork whenever that player is playing, and clear the display when it stops.
+
+Source Mirroring will be overridden on-device by artwork sent via the Tuneshine cloud service. If you want to ensure you only see mirrored artwork, follow these steps:
+
+1. Go to the Tuneshine app on your phone and select your Tuneshine device
+2. Tap on the currently connected music service and select "Remove from this device" from the options
+3. Go to your Tuneshine's device settings (icon in the top right corner) and disable the "Show account disconnected warning" setting under Display Options at the bottom of the settings screen
 
 ## Sendspin
 
@@ -83,7 +90,7 @@ Remove the locally-provided image, returning the display to its idle state.
 
 ## API
 
-This integration was built against Tuneshine firmware 2.3.3 and Tuneshine device API 1.0.1.
+This integration was built against Tuneshine firmware 2.3.3 and Tuneshine device API 1.0.1, and updated for firmware 2.6.1.
 
 ## Vibecoding
 

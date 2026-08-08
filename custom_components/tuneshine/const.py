@@ -30,6 +30,7 @@ API_PATH_STATE = "/state"
 API_PATH_IMAGE = "/image"
 API_PATH_BRIGHTNESS = "/brightness"
 API_PATH_ARTWORK = "/artwork"
+API_PATH_PRESERVE_ARTWORK = "/preserve-artwork"
 
 # Poll every 10s — local device; always_update=False skips callbacks when data is unchanged.
 POLL_INTERVAL_SECONDS = 10

@@ -35,6 +35,18 @@
           "sendspin": "Sendspin",
           "none": "None"
         }
+      },
+      "wifi_status": {
+        "name": "Wifi Status",
+        "state": {
+          "no_credentials": "No credentials",
+          "not_connected": "Not connected",
+          "new_credentials": "New credentials",
+          "no_server_connection": "No server connection",
+          "no_local_server_connection": "No local server connection",
+          "local_server_connection_pending": "Local server connection pending",
+          "connected": "Connected"
+        }
       }
     },
     "select": {
@@ -51,6 +63,11 @@
       },
       "brightness_idle": {
         "name": "Idle Brightness"
+      }
+    },
+    "switch": {
+      "preserve_artwork": {
+        "name": "Preserve Artwork"
       }
     }
   },

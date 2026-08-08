@@ -17,7 +17,13 @@ from .sendspin import SendspinWebSocketView
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.MEDIA_PLAYER, Platform.NUMBER, Platform.SELECT, Platform.SENSOR]
+PLATFORMS: list[Platform] = [
+    Platform.MEDIA_PLAYER,
+    Platform.NUMBER,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+]
 
 # Guard so the WebSocket view is only registered once even when multiple
 # Tuneshine devices are configured.

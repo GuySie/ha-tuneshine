@@ -54,14 +54,16 @@ The mode is persisted to `entry.options[CONF_INPUT_MODE]`. Switching modes is ha
 - Sendspin mDNS service name includes hardware_id for per-device uniqueness: `{device_name} ({hardware_id})._sendspin._tcp.local.`
 - mDNS registration is idempotent (`_sendspin_mdns_info` checked before registering); `_async_unregister_sendspin_mdns` is the single unregister path used both at runtime and on entry unload
 - `media_image_remotely_accessible = False` when Sendspin is active — device artwork URL is local HTTP, which HA must proxy to avoid mixed-content blocks in the HTTPS frontend
-- Sendspin artwork is uploaded without `imageUrl` in the multipart metadata so the device stores the binary at `GET /artwork` — including `imageUrl` alongside the binary suppresses storage (device serves 404 from `/artwork` even though the image displays correctly)
+- Sendspin artwork is uploaded without `imageUrl` in the multipart metadata so the device stores the binary at `GET /artwork` — on firmware 2.3.3, including `imageUrl` alongside the binary suppressed storage (device served 404 from `/artwork` even though the image displayed correctly). **Fixed as of firmware 2.6.1** (verified live 2026-08-09 — `/artwork` now serves the uploaded binary correctly either way) but the omission is kept since it's harmless and firmware versions predating 2.6.1 are still in the wild
 - Declare `media_width/height: 512` in `client/hello` so the Sendspin server sends a higher-resolution image; integration then resizes to 64×64 before uploading to device
 - `stream/clear` is treated identically to `stream/end` (discards cached artwork and clears device)
 
 ## API Reference
 
-See `.claude/api_reference.md` (not committed) for the Tuneshine local HTTP API spec, known spec inaccuracies vs actual device behavior, and sample responses. Built against firmware 2.3.3 (OpenAPI 1.0.1).
+See `.claude/api_reference.md` (not committed) for the Tuneshine local HTTP API spec, known spec inaccuracies vs actual device behavior, and sample responses. Built against firmware 2.3.3, updated for 2.6.1 (OpenAPI 1.0.1 in both — the spec's `info.version` doesn't track firmware changes, so diff `/openapi.json` directly rather than trusting it).
 
-Key endpoints: `GET /health`, `GET /state`, `POST /image`, `DELETE /image`, `POST /brightness`.
+Key endpoints: `GET /health`, `GET /state`, `POST /image`, `DELETE /image`, `POST /brightness`, `POST /preserve-artwork` (2.6.1+).
+
+**Firmware 2.6.1** added `mode`/`createdAt`/`wifi` to `/state` and a `preserveArtwork` device setting (`POST /preserve-artwork`, exposed as a switch entity) that changes `DELETE /image` semantics: when enabled, a bare `DELETE /image` keeps the last image on screen (dimmed) instead of reverting to idle. The coordinator's internal clear-image calls always pass `preserveImage: false` to force a real revert regardless of that device-level setting — see `.claude/api_reference.md` for details. Several other new endpoints (`DELETE /state`, `PUT /name`, `POST /diagnostics`, `DELETE /wifi`) are local-mode-only (422 in cloud mode) and not exposed by the integration, since cloud mode is the normal pairing for this device.
 
 See `.claude/sendspin_reference.md` (not committed) for the Sendspin protocol spec, including message types, delta semantics, binary message structure, mDNS/WebSocket endpoint details, and Tuneshine-specific implementation notes.

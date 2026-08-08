@@ -241,9 +241,13 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         await self.async_request_refresh()
 
     async def async_clear_local_image(self) -> None:
-        """DELETE /image and clear the optimistic local metadata immediately."""
+        """DELETE /image and clear the optimistic local metadata immediately.
+
+        Forces preserve_image=False so this always reverts the device to its
+        idle image, regardless of the device's own preserve-artwork setting.
+        """
         _LOGGER.debug("async_clear_local_image called")
-        await self.client.async_clear_image()
+        await self.client.async_clear_image(preserve_image=False)
         self.optimistic_local_metadata = None
         self.async_update_listeners()
         await self.async_request_refresh()
@@ -784,7 +788,7 @@ class TuneshineDataUpdateCoordinator(DataUpdateCoordinator[TuneshineState]):
         self.optimistic_local_metadata = None
         self.async_update_listeners()
         try:
-            await self.client.async_clear_image()
+            await self.client.async_clear_image(preserve_image=False)
             _LOGGER.debug("Sendspin playback stopped — device blanked successfully")
         except TuneshineApiError as err:
             _LOGGER.warning("Failed to blank device on Sendspin playback stop: %s", err)
