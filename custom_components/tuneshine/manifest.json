@@ -1,11 +1,12 @@
 {
   "domain": "tuneshine",
   "name": "Tuneshine",
-  "version": "1.0.0",
+  "codeowners": ["@guysie"],
   "config_flow": true,
+  "dependencies": ["http", "zeroconf"],
+  "documentation": "https://github.com/GuySie/ha-tuneshine",
   "integration_type": "device",
   "iot_class": "local_polling",
-  "dependencies": ["http", "zeroconf"],
-  "zeroconf": ["_tuneshine._tcp.local."],
-  "codeowners": ["@guysie"]
+  "version": "1.0.0",
+  "zeroconf": ["_tuneshine._tcp.local."]
 }
